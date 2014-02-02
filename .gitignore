@@ -1,0 +1,26 @@
+# Eclipse CDT things
+.cproject
+.project
+.settings
+/Debug
+/Release
+# Common C/C++ things
+*.o
+*.out
+# Doxygen output
+/html
+/latex
+# Project specific things
+lib/libggp.so
+bin/test
+*.ggp
+*.pl
+!interface.pl
+*.kif
+!/test/tictactoe.kif
+!/test/breakthrough.kif
+*.yap
+stanford
+games
+lib/*
+!.gitkeep
