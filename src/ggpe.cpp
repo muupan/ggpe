@@ -43,7 +43,7 @@ using Mutex = std::mutex;
 Mutex mutex;
 
 std::vector<YAP_Atom> roles;
-std::vector<int> role_indexes;
+std::vector<int> role_indices;
 std::unordered_map<YAP_Atom, int> atom_to_role_index;
 std::unordered_map<YAP_Atom, int> atom_to_functor_arity;
 std::unordered_map<YAP_Atom, int> atom_to_goal_values;
@@ -405,7 +405,7 @@ void CacheGoalValues(const std::unordered_set<std::string>& non_functor_atom_str
 
 void CacheRoles() {
   roles.clear();
-  role_indexes.clear();
+  role_indices.clear();
   atom_to_role_index.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_role_functor, 1, args.data());
@@ -423,7 +423,7 @@ void CacheRoles() {
   for (const auto role_term : role_terms) {
     const auto role_atom = YAP_AtomOfTerm(role_term);
     roles.push_back(role_atom);
-    role_indexes.push_back(role_indexes.size());
+    role_indices.push_back(role_indices.size());
     atom_to_role_index.emplace(role_atom, atom_to_role_index.size());
   }
   YAP_Reset();
@@ -737,8 +737,12 @@ int GetRoleCount() {
   return roles.size();
 }
 
-const std::vector<int>& GetRoleIndexes() {
-  return role_indexes;
+const std::vector<int>& GetRoleIndices() {
+  return role_indices;
+}
+
+bool IsValidRoleIndex(const int role_idx) {
+  return std::find(role_indices.begin(), role_indices.end(), role_idx) != role_indices.end();
 }
 
 std::string RoleIndexToString(const int role_index) {

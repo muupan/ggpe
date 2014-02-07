@@ -110,7 +110,12 @@ int GetRoleCount();
 /**
  * @return an ordered set of role indices, facilitating iteration
  */
-const std::vector<int>& GetRoleIndexes();
+const std::vector<int>& GetRoleIndices();
+
+/**
+ * @return true iif a given role_idx is valid
+ */
+bool IsValidRoleIndex(const int role_idx);
 
 /**
  * Convert: role index -> string representation
