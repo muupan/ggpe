@@ -16,10 +16,16 @@ const auto kif_breakthrough = LoadStringFromFile("test/breakthrough.kif");
 
 TEST(Initialize, TicTacToe) {
   ggpe::Initialize(kif_tictactoe);
-  ggpe::State state;
   ASSERT_TRUE(ggpe::GetRoleCount() == 2);
+  ASSERT_TRUE(ggpe::GetRoleIndices().size() == 2);
+  ASSERT_FALSE(ggpe::IsValidRoleIndex(-1));
+  ASSERT_TRUE(ggpe::IsValidRoleIndex(0));
+  ASSERT_TRUE(ggpe::IsValidRoleIndex(1));
+  ASSERT_FALSE(ggpe::IsValidRoleIndex(2));
   ASSERT_TRUE(ggpe::StringToRoleIndex("white") == 0);
   ASSERT_TRUE(ggpe::StringToRoleIndex("black") == 1);
+
+  ggpe::State state;
   const auto& facts = state.GetFacts();
   ASSERT_TRUE(facts.size() == 10);
   const auto answer_fact_strs = std::vector<std::string>({
