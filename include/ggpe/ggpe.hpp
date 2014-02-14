@@ -22,17 +22,25 @@ using Atom = YAP_Atom;
  */
 using Tuple = std::vector<Atom>;
 /**
+ * Fact tuple
+ */
+using Fact = Tuple;
+/**
+ * Action tuple
+ */
+using Action = Tuple;
+/**
  * Set of Fact (order is not guaranteed)
  */
-using FactSet = std::vector<Tuple>;
+using FactSet = std::vector<Fact>;
 /**
  * Set of Action (order is not guaranteed)
  */
-using ActionSet = std::vector<Tuple>;
+using ActionSet = std::vector<Action>;
 /**
  * Joint action (= every role's action, order by role)
  */
-using JointAction = std::vector<Tuple>; // ordered
+using JointAction = std::vector<Action>;
 
 /**
  * A game state with manipulation interface
