@@ -111,6 +111,12 @@ using StateAction = std::pair<State, JointAction>;
 void Initialize(const std::string& kif);
 
 /**
+ * Initialize GGP Engine with a given KIF string
+ * This is needed before using other functionalities
+ */
+void InitializeFromFile(const std::string& kif_filename);
+
+/**
  * @return the number of roles in the game
  */
 int GetRoleCount();
