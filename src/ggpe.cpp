@@ -725,6 +725,20 @@ void Initialize(const std::string& kif) {
 //  DetectActionOrderedArgs();
 }
 
+namespace {
+
+std::string LoadStringFromFile(const std::string& filename) {
+  std::ifstream ifs(filename);
+  assert(ifs);
+  return std::string((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+}
+
+}
+
+void InitializeFromFile(const std::string& kif_filename) {
+  Initialize(LoadStringFromFile(kif_filename));
+}
+
 const std::vector<Tuple>& GetPossibleFacts() {
   return possible_facts;
 }
