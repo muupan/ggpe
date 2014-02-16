@@ -198,6 +198,9 @@ const std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, in
  */
 const std::unordered_map<Atom, std::unordered_map<Atom, int>>& GetOrderedDomains();
 
+void SetNextStateCachingEnabled(const bool next_state_caching_enabled);
+bool IsNextStateCachingEnabled();
+
 }
 
 namespace std {

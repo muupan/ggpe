@@ -64,6 +64,9 @@ TEST(Initialize, TicTacToe) {
   }
   state.GetLegalActions();
   state.Simulate();
+  SetNextStateCachingEnabled(true);
+  SimpleSimulate(State());
+  SetNextStateCachingEnabled(false);
   SimpleSimulate(State());
 }
 
@@ -77,6 +80,9 @@ TEST(Initialize, Breakthrough) {
   ASSERT_TRUE(facts.size() == 33);
   state.GetLegalActions();
   state.Simulate();
+  SetNextStateCachingEnabled(true);
+  SimpleSimulate(State());
+  SetNextStateCachingEnabled(false);
   SimpleSimulate(State());
 }
 
