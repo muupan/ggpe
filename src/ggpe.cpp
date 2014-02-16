@@ -802,9 +802,7 @@ State State::GetNextState(const JointAction& joint_action) const {
   if (next_state_caching_enabled) {
     auto next_facts_cache = next_facts_.find(joint_action);
     if (next_facts_cache != next_facts_.end()) {
-      if (next_facts_cache->second.second.empty()) {
-        return State(next_facts_cache->second.first, next_facts_cache->second.second);
-      }
+      return State(next_facts_cache->second.first, next_facts_cache->second.second);
     }
   }
   std::lock_guard<Mutex> lk(mutex);
