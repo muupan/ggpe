@@ -17,16 +17,6 @@
 
 #include "sexpr_parser.hpp"
 
-namespace std
-{
-template <class T, class U>
-struct hash<pair<T, U>> {
-  size_t operator()(const pair<T, U>& value) const {
-    return boost::hash_value(value);
-  }
-};
-}
-
 namespace ggpe {
 
 const auto kFunctorPrefix = std::string("f_");
@@ -46,7 +36,7 @@ std::vector<Tuple> possible_facts;
 std::vector<std::vector<Tuple>> possible_actions;
 std::unordered_map<YAP_Atom, std::unordered_map<YAP_Atom, int>> atom_to_ordered_domain;
 std::unordered_set<YAP_Atom> step_counter_atoms;
-std::unordered_map<std::pair<Atom, Atom>, std::vector<std::pair<Atom, std::pair<int, int>>>> fact_action_connections;
+std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, int>>>, boost::hash<AtomPair>> fact_action_connections;
 std::unordered_map<YAP_Atom, std::unordered_map<int, YAP_Atom>> fact_ordered_args;
 std::unordered_map<YAP_Atom, std::unordered_map<int, YAP_Atom>> action_ordered_args;
 
@@ -904,7 +894,7 @@ const std::unordered_set<Atom>& GetStepCounters() {
   return step_counter_atoms;
 }
 
-const std::unordered_map<std::pair<Atom, Atom>, std::vector<std::pair<Atom, std::pair<int, int>>>>& GetFactActionConnections() {
+const std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, int>>>, boost::hash<AtomPair>>& GetFactActionConnections() {
   return fact_action_connections;
 }
 
