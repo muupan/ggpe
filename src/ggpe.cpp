@@ -19,13 +19,6 @@
 
 namespace std
 {
-// Hasher for std::vector
-template <class T>
-struct hash<vector<T>> {
-  size_t operator()(const vector<T>& value) const {
-    return boost::hash_value(value);
-  }
-};
 template <class T, class U>
 struct hash<pair<T, U>> {
   size_t operator()(const pair<T, U>& value) const {
@@ -814,9 +807,13 @@ const std::vector<std::vector<Tuple>>& State::GetLegalActions() const {
   return legal_actions_;
 }
 
-State State::GetNextState(const std::vector<Tuple>& actions) const {
+State State::GetNextState(const JointAction& joint_action) const {
+  auto next_facts_cache = next_facts_.find(joint_action);
+  if (next_facts_cache != next_facts_.end()) {
+    return State(next_facts_cache->second);
+  }
   std::lock_guard<Mutex> lk(mutex);
-  std::array<YAP_Term, 4> args = {{ TuplesToYapPairTerm(facts_), JointActionToYapPairTerm(actions), YAP_MkVarTerm(), YAP_MkVarTerm() }};
+  std::array<YAP_Term, 4> args = {{ TuplesToYapPairTerm(facts_), JointActionToYapPairTerm(joint_action), YAP_MkVarTerm(), YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_next_and_goal_functor, 4, args.data());
   auto slot = YAP_InitSlot(goal);
 #ifdef NDEBUG
@@ -828,7 +825,9 @@ State State::GetNextState(const std::vector<Tuple>& actions) const {
   const auto result = YAP_GetFromSlot(slot);
   const auto facts_term = YAP_ArgOfTerm(3, result);
   const auto goal_term = YAP_ArgOfTerm(4, result);
-  State next_state(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term));
+  const auto pos = next_facts_.emplace(joint_action, YapPairTermToTuples(facts_term));
+  assert(pos.second);
+  State next_state(pos.first->second, YapPairTermToGoals(goal_term));
   YAP_Reset();
   YAP_RecoverSlots(1);
   return next_state;

@@ -11,6 +11,18 @@
 
 #include <Yap/YapInterface.h>
 
+namespace std {
+
+// Hasher for std::vector
+template <class T>
+struct hash<vector<T>> {
+  size_t operator()(const vector<T>& value) const {
+    return boost::hash_value(value);
+  }
+};
+
+}
+
 namespace ggpe {
 
 /**
@@ -95,6 +107,7 @@ public:
 private:
   FactSet facts_;
   mutable std::vector<ActionSet> legal_actions_;
+  mutable std::unordered_map<JointAction, FactSet> next_facts_;
   bool is_terminal_;
   mutable std::vector<int> goals_;
 };
