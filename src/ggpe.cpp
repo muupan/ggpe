@@ -39,6 +39,7 @@ std::unordered_set<YAP_Atom> step_counter_atoms;
 std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, int>>>, boost::hash<AtomPair>> fact_action_connections;
 std::unordered_map<YAP_Atom, std::unordered_map<int, YAP_Atom>> fact_ordered_args;
 std::unordered_map<YAP_Atom, std::unordered_map<int, YAP_Atom>> action_ordered_args;
+bool next_state_caching_enabled = false;
 
 // []
 YAP_Term empty_list_term;
@@ -798,10 +799,12 @@ const std::vector<std::vector<Tuple>>& State::GetLegalActions() const {
 }
 
 State State::GetNextState(const JointAction& joint_action) const {
-  auto next_facts_cache = next_facts_.find(joint_action);
-  if (next_facts_cache != next_facts_.end()) {
-    if (next_facts_cache->second.second.empty()) {
-      return State(next_facts_cache->second.first, next_facts_cache->second.second);
+  if (next_state_caching_enabled) {
+    auto next_facts_cache = next_facts_.find(joint_action);
+    if (next_facts_cache != next_facts_.end()) {
+      if (next_facts_cache->second.second.empty()) {
+        return State(next_facts_cache->second.first, next_facts_cache->second.second);
+      }
     }
   }
   std::lock_guard<Mutex> lk(mutex);
@@ -817,12 +820,18 @@ State State::GetNextState(const JointAction& joint_action) const {
   const auto result = YAP_GetFromSlot(slot);
   const auto facts_term = YAP_ArgOfTerm(3, result);
   const auto goal_term = YAP_ArgOfTerm(4, result);
-  const auto pos = next_facts_.emplace(joint_action, std::make_pair(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term)));
-  assert(pos.second);
-  State next_state(pos.first->second.first, pos.first->second.second);
-  YAP_Reset();
-  YAP_RecoverSlots(1);
-  return next_state;
+  if (next_state_caching_enabled) {
+    const auto pos = next_facts_.emplace(joint_action, std::make_pair(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term)));
+    assert(pos.second);
+    YAP_Reset();
+    YAP_RecoverSlots(1);
+    return State(pos.first->second.first, pos.first->second.second);
+  } else {
+    State next_state(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term));
+    YAP_Reset();
+    YAP_RecoverSlots(1);
+    return next_state;
+  }
 }
 
 bool State::IsTerminal() const {
@@ -902,6 +911,14 @@ const std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, in
 
 const std::unordered_map<Atom, std::unordered_map<Atom, int>>& GetOrderedDomains() {
   return atom_to_ordered_domain;
+}
+
+void SetNextStateCachingEnabled(const bool enabled) {
+  next_state_caching_enabled = enabled;
+}
+
+bool IsNextStateCachingEnabled() {
+  return next_state_caching_enabled;
 }
 
 }
