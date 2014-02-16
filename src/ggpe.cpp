@@ -800,7 +800,9 @@ const std::vector<std::vector<Tuple>>& State::GetLegalActions() const {
 State State::GetNextState(const JointAction& joint_action) const {
   auto next_facts_cache = next_facts_.find(joint_action);
   if (next_facts_cache != next_facts_.end()) {
-    return State(next_facts_cache->second);
+    if (next_facts_cache->second.second.empty()) {
+      return State(next_facts_cache->second.first, next_facts_cache->second.second);
+    }
   }
   std::lock_guard<Mutex> lk(mutex);
   std::array<YAP_Term, 4> args = {{ TuplesToYapPairTerm(facts_), JointActionToYapPairTerm(joint_action), YAP_MkVarTerm(), YAP_MkVarTerm() }};
@@ -815,9 +817,9 @@ State State::GetNextState(const JointAction& joint_action) const {
   const auto result = YAP_GetFromSlot(slot);
   const auto facts_term = YAP_ArgOfTerm(3, result);
   const auto goal_term = YAP_ArgOfTerm(4, result);
-  const auto pos = next_facts_.emplace(joint_action, YapPairTermToTuples(facts_term));
+  const auto pos = next_facts_.emplace(joint_action, std::make_pair(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term)));
   assert(pos.second);
-  State next_state(pos.first->second, YapPairTermToGoals(goal_term));
+  State next_state(pos.first->second.first, pos.first->second.second);
   YAP_Reset();
   YAP_RecoverSlots(1);
   return next_state;

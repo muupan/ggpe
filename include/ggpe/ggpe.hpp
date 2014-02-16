@@ -41,6 +41,7 @@ using ActionSet = std::vector<Action>;
  * Joint action (= every role's action, order by role)
  */
 using JointAction = std::vector<Action>;
+using Goals = std::vector<int>;
 
 /**
  * A game state with manipulation interface
@@ -95,7 +96,7 @@ public:
 private:
   FactSet facts_;
   mutable std::vector<ActionSet> legal_actions_;
-  mutable std::unordered_map<JointAction, FactSet, boost::hash<JointAction>> next_facts_;
+  mutable std::unordered_map<JointAction, std::pair<FactSet, Goals>, boost::hash<JointAction>> next_facts_;
   bool is_terminal_;
   mutable std::vector<int> goals_;
 };
