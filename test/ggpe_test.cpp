@@ -27,13 +27,13 @@ void SimpleSimulate(const State& state) {
   }
 }
 
-const auto kif_tictactoe = LoadStringFromFile("test/tictactoe.kif");
-const auto kif_breakthrough = LoadStringFromFile("test/breakthrough.kif");
+const auto tictactoe_filename = "test/tictactoe.kif";
+const auto breakthrough_filename = "test/breakthrough.kif";
 
 }
 
 TEST(Role, TicTacToe) {
-  Initialize(kif_tictactoe);
+  InitializeFromFile(tictactoe_filename);
   ASSERT_TRUE(GetRoleCount() == 2);
   ASSERT_TRUE(GetRoleIndices().size() == 2);
   ASSERT_FALSE(IsValidRoleIndex(-1));
@@ -45,7 +45,7 @@ TEST(Role, TicTacToe) {
 }
 
 TEST(InitialState, TicTacToe) {
-  Initialize(kif_tictactoe);
+  InitializeFromFile(tictactoe_filename);
   State state;
   ASSERT_FALSE(state.IsTerminal());
   const auto& facts = state.GetFacts();
@@ -69,7 +69,7 @@ TEST(InitialState, TicTacToe) {
 }
 
 TEST(GetLegalAction, TicTacToe) {
-  Initialize(kif_tictactoe);
+  InitializeFromFile(tictactoe_filename);
   State state;
   ASSERT_EQ(state.GetLegalActions().size(), 2);
   const auto actions_for_white = state.GetLegalActions().at(0);
@@ -101,7 +101,7 @@ TEST(GetLegalAction, TicTacToe) {
 }
 
 TEST(GetNextState, TicTacToe) {
-  Initialize(kif_tictactoe);
+  InitializeFromFile(tictactoe_filename);
   State state;
   JointAction joint_action({StringToTuple("(mark 2 2)"), StringToTuple("noop")});
   const auto next_state = state.GetNextState(joint_action);
@@ -128,7 +128,7 @@ TEST(GetNextState, TicTacToe) {
 }
 
 TEST(Simulate, TicTacToe) {
-  Initialize(kif_tictactoe);
+  InitializeFromFile(tictactoe_filename);
   State state;
   state.Simulate();
   SetNextStateCachingEnabled(true);
@@ -137,8 +137,8 @@ TEST(Simulate, TicTacToe) {
   SimpleSimulate(State());
 }
 
-TEST(Initialize, Breakthrough) {
-  Initialize(kif_breakthrough);
+TEST(InitializeFromFile, Breakthrough) {
+  InitializeFromFile(breakthrough_filename);
   State state;
   ASSERT_FALSE(state.IsTerminal());
   ASSERT_TRUE(GetRoleCount() == 2);
