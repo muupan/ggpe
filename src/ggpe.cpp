@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <boost/format.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/timer.hpp>
 #include <boost/functional/hash.hpp>
 #include <Yap/YapInterface.h>
@@ -679,15 +681,19 @@ void DetectActionOrderedArgs() {
     std::cout << std::endl;
   }
 }
-void Initialize(const std::string& kif) {
+
+void Initialize(const std::string& kif, const std::string& name) {
   assert(!kif.empty());
   const auto nodes = sexpr_parser::ParseKIF(kif);
   assert(!nodes.empty());
-  std::ofstream ofs("test.pl");
+  const auto tmp_pl_filename = name + ".pl";
+  const auto tmp_yap_filename = name + ".yap";
+  std::ofstream ofs(tmp_pl_filename);
   ofs << sexpr_parser::ToProlog(nodes, true, kFunctorPrefix, kAtomPrefix, true);
   ofs.close();
-  std::system("yap -g \"compile(['test.pl', 'interface.pl']), save_program('test.yap'), halt.\"");
-  YAP_FastInit("test.yap");
+  const auto compile_command = (boost::format("yap -g \"compile(['%s', 'interface.pl']), save_program('%s'), halt.\"") % tmp_pl_filename % tmp_yap_filename).str();
+  std::system(compile_command.c_str());
+  YAP_FastInit(tmp_yap_filename.c_str());
   // Disable atom garbage collection
   YAP_SetYAPFlag(YAPC_ENABLE_AGC, 0);
   const auto functor_atom_strs = sexpr_parser::CollectFunctorAtoms(nodes);
@@ -713,14 +719,17 @@ namespace {
 
 std::string LoadStringFromFile(const std::string& filename) {
   std::ifstream ifs(filename);
-  assert(ifs);
+  if (!ifs) {
+    throw std::runtime_error("File '" + filename + "' does not exists.");
+  }
   return std::string((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 }
 
 }
 
 void InitializeFromFile(const std::string& kif_filename) {
-  Initialize(LoadStringFromFile(kif_filename));
+  boost::filesystem::path path(kif_filename);
+  Initialize(LoadStringFromFile(kif_filename), path.stem().string());
 }
 
 const std::vector<Tuple>& GetPossibleFacts() {

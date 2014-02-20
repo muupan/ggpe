@@ -1,8 +1,8 @@
 # Common macros
 CXXFLAGS := -Wall -std=c++11 -I./include/ggpe -I./src
-LIBS := -L/usr/local/lib/ -lYap -lreadline -ldl -lgmp -pthread -lboost_regex-mt -lmysqlclient
-LIBS_OSX := -lodbc
-LIBS_LINUX :=
+LIBS := -L/usr/local/lib/ -lYap -lreadline -ldl -lgmp -pthread -lmysqlclient
+LIBS_OSX := -lodbc -lboost_regex-mt -lboost_system-mt -lboost_filesystem-mt
+LIBS_LINUX := -lboost_regex -lboost_system -lboost_filesystem
 OS := $(shell uname)
 ifeq ($(OS), Darwin)
 	LIBS += $(LIBS_OSX)
