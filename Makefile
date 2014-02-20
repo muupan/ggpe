@@ -1,6 +1,5 @@
 # Common macros
-CXX := clang++
-CXXFLAGS := -Wall -std=c++0x -I./include/ggpe -I./src
+CXXFLAGS := -Wall -std=c++11 -I./include/ggpe -I./src
 LIBS := -L/usr/local/lib/ -lYap -lreadline -ldl -lgmp -pthread -lboost_regex-mt
 LIBS_OSX := -lodbc
 LIBS_LINUX :=
