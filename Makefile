@@ -1,6 +1,6 @@
 # Common macros
-CXXFLAGS := -Wall -std=c++11 -I./include/ggpe -I./src
-LIBS := -L/usr/local/lib/ -lYap -lreadline -ldl -lgmp -pthread -lmysqlclient
+CXXFLAGS += -Wall -std=c++11 -I./include/ggpe -I./src
+LIBS := -lYap -lreadline -ldl -lgmp -pthread -lmysqlclient
 LIBS_OSX := -lodbc -lboost_regex-mt -lboost_system-mt -lboost_filesystem-mt
 LIBS_LINUX := -lboost_regex -lboost_system -lboost_filesystem
 OS := $(shell uname)
@@ -41,7 +41,7 @@ all: $(OBJS)
 .PHONY: test
 test: CXXFLAGS += $(CXXFLAGS_TEST)
 test: $(OBJS_TEST)
-	$(CXX) $(CXXFLAGS) -o $(TARGET_TEST) $(OBJS_TEST) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET_TEST) $(OBJS_TEST) $(LDFLAGS) $(LIBS)
 	./$(TARGET_TEST)
 
 .PHONY: clean
