@@ -788,7 +788,9 @@ const std::vector<std::vector<Tuple>>& State::GetLegalActions() const {
   if (!legal_actions_.empty()) {
     return legal_actions_;
   }
+#ifndef GGPE_SINGLE_THREAD
   std::lock_guard<Mutex> lk(mutex);
+#endif
   const auto fact_term = TuplesToYapPairTerm(facts_);
   std::array<YAP_Term, 2> args = {{ fact_term, YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_legal_functor, 2, args.data());
@@ -814,7 +816,9 @@ State State::GetNextState(const JointAction& joint_action) const {
       return State(next_facts_cache->second.first, next_facts_cache->second.second);
     }
   }
+#ifndef GGPE_SINGLE_THREAD
   std::lock_guard<Mutex> lk(mutex);
+#endif
   std::array<YAP_Term, 4> args = {{ TuplesToYapPairTerm(facts_), JointActionToYapPairTerm(joint_action), YAP_MkVarTerm(), YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_next_and_goal_functor, 4, args.data());
   auto slot = YAP_InitSlot(goal);
@@ -850,7 +854,9 @@ const std::vector<int>& State::GetGoals() const {
   if (!goals_.empty()) {
     return goals_;
   }
+#ifndef GGPE_SINGLE_THREAD
   std::lock_guard<Mutex> lk(mutex);
+#endif
   const auto fact_term = TuplesToYapPairTerm(facts_);
   std::array<YAP_Term, 2> args = {{ fact_term, YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_goal_functor, 2, args.data());
@@ -871,7 +877,9 @@ const std::vector<int>& State::GetGoals() const {
 }
 
 std::vector<int> State::Simulate() const {
+#ifndef GGPE_SINGLE_THREAD
   std::lock_guard<Mutex> lk(mutex);
+#endif
   const auto fact_term = TuplesToYapPairTerm(facts_);
   std::array<YAP_Term, 2> args = {{ fact_term, YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_simulate_functor, 2, args.data());
