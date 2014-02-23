@@ -119,6 +119,12 @@ void Initialize(const std::string& kif, const std::string& name="tmp");
 void InitializeFromFile(const std::string& kif_filename);
 
 /**
+ * Initialize GGP Engine with TicTacToe KIF string.
+ * This is intended for testing functionalities.
+ */
+void InitializeTicTacToe();
+
+/**
  * @return the number of roles in the game
  */
 int GetRoleCount();
