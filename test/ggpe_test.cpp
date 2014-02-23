@@ -10,12 +10,6 @@ namespace ggpe {
 
 namespace {
 
-std::string LoadStringFromFile(const std::string& filename) {
-  std::ifstream ifs(filename);
-  assert(ifs);
-  return std::string((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-}
-
 void SimpleSimulate(const State& state) {
   auto tmp_state = state;
   while (!tmp_state.IsTerminal()) {
@@ -33,23 +27,23 @@ const auto breakthrough_filename = "test/breakthrough.kif";
 }
 
 TEST(Role, TicTacToe) {
-  InitializeFromFile(tictactoe_filename);
-  ASSERT_TRUE(GetRoleCount() == 2);
-  ASSERT_TRUE(GetRoleIndices().size() == 2);
+  InitializeTicTacToe();
+  ASSERT_EQ(GetRoleCount(), 2);
+  ASSERT_EQ(GetRoleIndices().size(), 2);
   ASSERT_FALSE(IsValidRoleIndex(-1));
   ASSERT_TRUE(IsValidRoleIndex(0));
   ASSERT_TRUE(IsValidRoleIndex(1));
   ASSERT_FALSE(IsValidRoleIndex(2));
-  ASSERT_TRUE(StringToRoleIndex("white") == 0);
-  ASSERT_TRUE(StringToRoleIndex("black") == 1);
+  ASSERT_EQ(StringToRoleIndex("white"), 0);
+  ASSERT_EQ(StringToRoleIndex("black"), 1);
 }
 
 TEST(InitialState, TicTacToe) {
-  InitializeFromFile(tictactoe_filename);
+  InitializeTicTacToe();
   State state;
   ASSERT_FALSE(state.IsTerminal());
   const auto& facts = state.GetFacts();
-  ASSERT_TRUE(facts.size() == 10);
+  ASSERT_EQ(facts.size(), 10);
   const auto answer_fact_strs = std::vector<std::string>({
     "(cell 1 1 b)",
     "(cell 1 2 b)",
@@ -64,12 +58,12 @@ TEST(InitialState, TicTacToe) {
   });
   for (const auto& answer_fact_str : answer_fact_strs) {
     const auto answer_fact = StringToTuple(answer_fact_str);
-    ASSERT_TRUE(std::find(facts.begin(), facts.end(), answer_fact) != facts.end());
+    ASSERT_NE(std::find(facts.begin(), facts.end(), answer_fact), facts.end());
   }
 }
 
 TEST(GetLegalAction, TicTacToe) {
-  InitializeFromFile(tictactoe_filename);
+  InitializeTicTacToe();
   State state;
   ASSERT_EQ(state.GetLegalActions().size(), 2);
   const auto actions_for_white = state.GetLegalActions().at(0);
@@ -101,7 +95,7 @@ TEST(GetLegalAction, TicTacToe) {
 }
 
 TEST(GetNextState, TicTacToe) {
-  InitializeFromFile(tictactoe_filename);
+  InitializeTicTacToe();
   State state;
   JointAction joint_action({StringToTuple("(mark 2 2)"), StringToTuple("noop")});
   const auto next_state = state.GetNextState(joint_action);
@@ -128,7 +122,7 @@ TEST(GetNextState, TicTacToe) {
 }
 
 TEST(Simulate, TicTacToe) {
-  InitializeFromFile(tictactoe_filename);
+  InitializeTicTacToe();
   State state;
   state.Simulate();
   SetNextStateCachingEnabled(true);
