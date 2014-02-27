@@ -124,6 +124,8 @@ void InitializeFromFile(const std::string& kif_filename);
  */
 void InitializeTicTacToe();
 
+const std::string& GetGameName();
+
 /**
  * @return the number of roles in the game
  */

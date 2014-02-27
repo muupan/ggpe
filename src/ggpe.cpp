@@ -27,6 +27,7 @@ const auto kAtomPrefix = std::string("a_");
 using Mutex = std::mutex;
 Mutex mutex;
 
+std::string game_name;
 std::vector<YAP_Atom> roles;
 std::vector<int> role_indices;
 std::unordered_map<YAP_Atom, int> atom_to_role_index;
@@ -684,6 +685,8 @@ void DetectActionOrderedArgs() {
 
 void Initialize(const std::string& kif, const std::string& name) {
   assert(!kif.empty());
+  assert(!name.empty());
+  game_name = name;
   const auto nodes = sexpr_parser::ParseKIF(kif);
   assert(!nodes.empty());
   const auto tmp_pl_filename = name + ".pl";
@@ -1097,6 +1100,10 @@ void InitializeTicTacToe() {
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 )";
   Initialize(tictactoe_kif, "tictactoe");
+}
+
+const std::string& GetGameName() {
+  return game_name;
 }
 
 }
