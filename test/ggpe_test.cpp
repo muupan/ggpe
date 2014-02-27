@@ -26,6 +26,11 @@ const auto breakthrough_filename = "test/breakthrough.kif";
 
 }
 
+TEST(GetGameName, TicTacToe) {
+  InitializeTicTacToe();
+  ASSERT_EQ(GetGameName(), "tictactoe");
+}
+
 TEST(Role, TicTacToe) {
   InitializeTicTacToe();
   ASSERT_EQ(GetRoleCount(), 2);
