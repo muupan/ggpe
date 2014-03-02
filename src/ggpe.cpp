@@ -905,6 +905,10 @@ bool State::operator==(const State& another) const {
   return facts_ == another.facts_;
 }
 
+bool State::operator!=(const State& another) const {
+  return facts_ != another.facts_;
+}
+
 std::string JointActionToString(const JointAction& joint_action) {
   assert(joint_action.size() == roles.size());
   std::ostringstream o;

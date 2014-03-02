@@ -93,6 +93,7 @@ public:
    */
   std::string ToString() const;
   bool operator==(const State& another) const;
+  bool operator!=(const State& another) const;
 private:
   FactSet facts_;
   mutable std::vector<ActionSet> legal_actions_;
