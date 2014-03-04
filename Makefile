@@ -1,6 +1,6 @@
 # Common macros
 CXXFLAGS += -Wall -std=c++11 -I./include/ggpe -I./src
-LIBS := -lYap -lreadline -ldl -lgmp -pthread -lmysqlclient
+LIBS := -lYap -lreadline -ldl -lgmp -pthread -lmysqlclient -lglog
 LIBS_OSX := -lodbc -lboost_regex-mt -lboost_system-mt -lboost_filesystem-mt
 LIBS_LINUX := -lboost_regex -lboost_system -lboost_filesystem
 OS := $(shell uname)

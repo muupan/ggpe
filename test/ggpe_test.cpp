@@ -136,6 +136,11 @@ TEST(Simulate, TicTacToe) {
   SimpleSimulate(State());
 }
 
+TEST(Atoms, TicTacToe) {
+  InitializeTicTacToe();
+  ASSERT_EQ(AtomToString(atoms::kFree), "?");
+}
+
 TEST(InitializeFromFile, Breakthrough) {
   InitializeFromFile(breakthrough_filename);
   State state;

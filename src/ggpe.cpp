@@ -15,7 +15,10 @@
 #include <boost/filesystem.hpp>
 #include <boost/timer.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/bimap/bimap.hpp>
+#include <boost/bimap/unordered_set_of.hpp>
 #include <Yap/YapInterface.h>
+#include <glog/logging.h>
 
 #include "sexpr_parser.hpp"
 
@@ -27,21 +30,27 @@ const auto kAtomPrefix = std::string("a_");
 using Mutex = std::mutex;
 Mutex mutex;
 
+template <class K, class V>
+using UnorderedBimap = boost::bimaps::bimap<boost::bimaps::unordered_set_of<K>, boost::bimaps::unordered_set_of<V>>;
+using AtomAndString = UnorderedBimap<Atom, std::string>::value_type;
+UnorderedBimap<Atom, std::string> atom_to_string;
+using AtomAndYapAtom = UnorderedBimap<Atom, YAP_Atom>::value_type;
+UnorderedBimap<Atom, YAP_Atom> atom_to_yap_atom;
 std::string game_name;
-std::vector<YAP_Atom> roles;
+std::vector<Atom> roles;
 std::vector<int> role_indices;
-std::unordered_map<YAP_Atom, int> atom_to_role_index;
-std::unordered_map<YAP_Atom, int> atom_to_functor_arity;
-std::unordered_map<YAP_Atom, int> atom_to_goal_values;
+std::unordered_map<Atom, int> atom_to_role_index;
+std::unordered_map<Atom, int> atom_to_functor_arity;
+std::unordered_map<Atom, int> atom_to_goal_values;
 std::unordered_map<std::string, int> functor_name_to_arity;
 std::vector<Tuple> initial_facts;
 std::vector<Tuple> possible_facts;
 std::vector<std::vector<Tuple>> possible_actions;
-std::unordered_map<YAP_Atom, std::unordered_map<YAP_Atom, int>> atom_to_ordered_domain;
-std::unordered_set<YAP_Atom> step_counter_atoms;
+std::unordered_map<Atom, std::unordered_map<Atom, int>> atom_to_ordered_domain;
+std::unordered_set<Atom> step_counter_atoms;
 std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, int>>>, boost::hash<AtomPair>> fact_action_connections;
-std::unordered_map<YAP_Atom, std::unordered_map<int, YAP_Atom>> fact_ordered_args;
-std::unordered_map<YAP_Atom, std::unordered_map<int, YAP_Atom>> action_ordered_args;
+std::unordered_map<Atom, std::unordered_map<int, Atom>> fact_ordered_args;
+std::unordered_map<Atom, std::unordered_map<int, Atom>> action_ordered_args;
 bool next_state_caching_enabled = false;
 
 // []
@@ -76,22 +85,42 @@ YAP_Functor state_fact_ordered_args_functor;
 // state_action_ordered_args/1
 YAP_Functor state_action_ordered_args_functor;
 
-std::string AtomToString(const YAP_Atom atom) {
-  assert(kFunctorPrefix.size() == kAtomPrefix.size());
-  return std::string(YAP_AtomName(atom)).substr(kFunctorPrefix.size());
+const std::string& AtomToString(const Atom atom) {
+  return atom_to_string.left.at(atom);
 }
 
-YAP_Atom StringToAtom(const std::string& atom_str) {
-  return YAP_LookupAtom((kAtomPrefix + atom_str).c_str());
+Atom StringToAtom(const std::string& atom_str) {
+  return atom_to_string.right.at(atom_str);
 }
 
-YAP_Atom StringToFunctor(const std::string& functor_str) {
-  return YAP_LookupAtom((kFunctorPrefix + functor_str).c_str());
+YAP_Atom AtomToYapAtom(const Atom atom) {
+  return atom_to_yap_atom.left.at(atom);
+}
+
+Atom YapAtomToAtom(const YAP_Atom yap_atom) {
+  return atom_to_yap_atom.right.at(yap_atom);
+}
+
+YAP_Atom StringToYapAtom(const std::string& atom_str) {
+  return AtomToYapAtom(StringToAtom(atom_str));
+}
+
+const std::string& YapAtomToString(const YAP_Atom yap_atom) {
+  return AtomToString(YapAtomToAtom(yap_atom));
+}
+
+Atom YapTermToAtom(const YAP_Term term) {
+  assert(YAP_IsAtomTerm(term));
+  return YapAtomToAtom(YAP_AtomOfTerm(term));
+}
+
+YAP_Term AtomToYapTerm(const Atom atom) {
+  return YAP_MkAtomTerm(AtomToYapAtom(atom));
 }
 
 std::string YapAtomTermToString(const YAP_Term& term) {
   assert(YAP_IsAtomTerm(term));
-  return AtomToString(YAP_AtomOfTerm(term));
+  return AtomToString(YapTermToAtom(term));
 }
 
 std::string YapTermToString(const YAP_Term& term);
@@ -101,7 +130,7 @@ std::string YapCompoundTermToString(const YAP_Term& term) {
   const auto f = YAP_FunctorOfTerm(term);
   const auto n = static_cast<int>(YAP_ArityOfFunctor(f));
   std::ostringstream o;
-  o << '(' << AtomToString(YAP_NameOfFunctor(f)) << ' ';
+  o << '(' << YapAtomToString(YAP_NameOfFunctor(f)) << ' ';
   for (auto i = 1; i <= n; ++i) {
     const auto arg = YAP_ArgOfTerm(i, term);
     o << YapTermToString(arg);
@@ -129,12 +158,14 @@ Tuple YapCompoundTermToTuple(const YAP_Term& term) {
   const auto arity = YAP_ArityOfFunctor(functor);
   Tuple tuple;
   tuple.reserve(arity + 1);
-  tuple.push_back(YAP_NameOfFunctor(functor));
+  const auto functor_atom = YapAtomToAtom(YAP_NameOfFunctor(functor));
+  tuple.push_back(functor_atom);
   for (auto i = 1; i <= static_cast<int>(arity); ++i) {
     const auto arg = YAP_ArgOfTerm(i, term);
     assert(YAP_IsAtomTerm(arg) || YAP_IsApplTerm(arg));
     if (YAP_IsAtomTerm(arg)) {
-      tuple.push_back(YAP_AtomOfTerm(arg));
+      const auto arg_atom = YapTermToAtom(arg);
+      tuple.push_back(arg_atom);
     } else {
       // Compound terms are flattened
       const auto arg_tuple = YapCompoundTermToTuple(arg);
@@ -147,7 +178,7 @@ Tuple YapCompoundTermToTuple(const YAP_Term& term) {
 Tuple YapTermToTuple(const YAP_Term& term) {
   assert(YAP_IsAtomTerm(term) || YAP_IsApplTerm(term));
   if (YAP_IsAtomTerm(term)) {
-    return Tuple({YAP_AtomOfTerm(term)});
+    return Tuple({YapTermToAtom(term)});
   } else {
     return YapCompoundTermToTuple(term);
   }
@@ -155,11 +186,12 @@ Tuple YapTermToTuple(const YAP_Term& term) {
 
 template <class Iterator>
 YAP_Term TupleToYapTerm(Iterator& pos) {
+//  static_assert(std::is_same<decltype(*pos), Atom>::value, "");
   if (!atom_to_functor_arity.count(*pos)) {
-    return YAP_MkAtomTerm(*(pos++));
+    return AtomToYapTerm(*(pos++));
   }
   const auto arity = atom_to_functor_arity[*pos];
-  const auto functor = YAP_MkFunctor(*pos, arity);
+  const auto functor = YAP_MkFunctor(AtomToYapAtom(*pos), arity);
   ++pos;
   std::vector<YAP_Term> args(arity);
   for (auto i = 0; i < arity; ++i) {
@@ -196,10 +228,10 @@ std::vector<std::vector<Tuple>> YapPairTermToActions(const YAP_Term pair_term) {
     assert(YAP_IsPairTerm(pair));
     const auto role_term = YAP_HeadOfTerm(pair);
     assert(YAP_IsAtomTerm(role_term));
-    const auto role_atom = YAP_AtomOfTerm(role_term);
+    const auto role_atom = YapTermToAtom(role_term);
     const auto action_term = YAP_HeadOfTerm(YAP_TailOfTerm(pair));
     assert(YAP_IsPairTerm(action_term));
-    const auto role_index = atom_to_role_index[role_atom];
+    const auto role_index = atom_to_role_index.at(role_atom);
     actions[role_index] = YapPairTermToTuples(action_term);
     temp_term = YAP_TailOfTerm(temp_term);
     ++pair_count;
@@ -219,10 +251,10 @@ std::vector<int> YapPairTermToGoals(const YAP_Term pair_term) {
     assert(YAP_IsPairTerm(pair));
     const auto role_term = YAP_HeadOfTerm(pair);
     assert(YAP_IsAtomTerm(role_term));
-    const auto role_atom = YAP_AtomOfTerm(role_term);
+    const auto role_atom = YapTermToAtom(role_term);
     const auto goal_term = YAP_HeadOfTerm(YAP_TailOfTerm(pair));
     assert(YAP_IsAtomTerm(goal_term));
-    const auto goal_atom = YAP_AtomOfTerm(goal_term);
+    const auto goal_atom = YapTermToAtom(goal_term);
     goals[atom_to_role_index[role_atom]] = atom_to_goal_values[goal_atom];
     temp_term = YAP_TailOfTerm(temp_term);
     ++goal_count;
@@ -247,14 +279,14 @@ std::vector<YAP_Term> YapPairTermToYapTerms(const YAP_Term pair_term) {
   return terms;
 }
 
-std::vector<YAP_Atom> YapPairTermToAtoms(const YAP_Term pair_term) {
+std::vector<Atom> YapPairTermToAtoms(const YAP_Term pair_term) {
   assert(YAP_IsPairTerm(pair_term) || pair_term == empty_list_term);
-  std::vector<YAP_Atom> atoms;
+  std::vector<Atom> atoms;
   auto temp_term = pair_term;
   while (YAP_IsPairTerm(temp_term)) {
     const auto head = YAP_HeadOfTerm(temp_term);
     assert(YAP_IsAtomTerm(head));
-    atoms.push_back(YAP_AtomOfTerm(head));
+    atoms.push_back(YapTermToAtom(head));
     temp_term = YAP_TailOfTerm(temp_term);
   }
   assert(temp_term == empty_list_term);
@@ -277,14 +309,14 @@ YAP_Term YapTermsToYapPairTerm(const YAP_Term& x, const YAP_Term& y) {
 YAP_Term JointActionToYapPairTerm(const std::vector<Tuple>& joint_action) {
   assert(!joint_action.empty());
   auto temp = empty_list_term;
-  for (auto role_id = 0; role_id < static_cast<int>(roles.size()); ++role_id) {
-    const auto role_action_pair = YapTermsToYapPairTerm(YAP_MkAtomTerm(roles[role_id]), TupleToYapTerm(joint_action[role_id]));
+  for (const auto role_idx : role_indices) {
+    const auto role_action_pair = YapTermsToYapPairTerm(AtomToYapTerm(roles[role_idx]), TupleToYapTerm(joint_action[role_idx]));
     temp = YAP_MkPairTerm(role_action_pair, temp);
   }
   return temp;
 }
 
-std::string YapAtomsToString(const std::vector<YAP_Atom>& atoms) {
+std::string AtomsToString(const std::vector<Atom>& atoms) {
   std::ostringstream o;
   o << '[';
   for (auto i = atoms.begin(); i != atoms.end(); ++i) {
@@ -341,7 +373,7 @@ Tuple NodeToTuple(const sexpr_parser::TreeNode& node) {
     assert(node.GetChildren().front().IsLeaf());
     Tuple tuple;
     tuple.reserve(node.GetChildren().size());
-    tuple.push_back(StringToFunctor(node.GetChildren().front().GetValue()));
+    tuple.push_back(StringToAtom(node.GetChildren().front().GetValue()));
     const auto& children = node.GetChildren();
     for (auto i = children.begin() + 1; i != children.end(); ++i) {
       const auto arg_tuple = NodeToTuple(*i);
@@ -408,7 +440,7 @@ void CacheRoles() {
   const auto role_terms = YapPairTermToYapTerms(role_list_term);
   assert(!role_terms.empty() && "There must be at least one role.");
   for (const auto role_term : role_terms) {
-    const auto role_atom = YAP_AtomOfTerm(role_term);
+    const auto role_atom = YapTermToAtom(role_term);
     roles.push_back(role_atom);
     role_indices.push_back(role_indices.size());
     atom_to_role_index.emplace(role_atom, atom_to_role_index.size());
@@ -484,7 +516,7 @@ void DetectStepCounters() {
     const auto step_counter_atoms_term = YAP_ArgOfTerm(1, result);
     assert(YAP_IsPairTerm(step_counter_atoms_term));
     const auto atoms = YapPairTermToAtoms(step_counter_atoms_term);
-    std::cout << "Step counters: " << YapAtomsToString(atoms) << std::endl;
+    std::cout << "Step counters: " << AtomsToString(atoms) << std::endl;
     step_counter_atoms.insert(atoms.begin(), atoms.end());
   }
   YAP_Reset();
@@ -508,13 +540,13 @@ void DetectOrderedDomains() {
       // Relation atom
       const auto relation_atom_term = terms.front();
       assert(YAP_IsAtomTerm(relation_atom_term));
-      const auto relation_atom = YAP_AtomOfTerm(relation_atom_term);
+      const auto relation_atom = YapTermToAtom(relation_atom_term);
       // Domain atoms
       const auto domain_term = terms.back();
       assert(YAP_IsPairTerm(domain_term));
       const auto domain_atoms = YapPairTermToAtoms(domain_term);
-      std::cout << "Domain by " << AtomToString(relation_atom) << ": " << YapAtomsToString(domain_atoms) << std::endl;
-      std::unordered_map<YAP_Atom, int> domain_map;
+      std::cout << "Domain by " << AtomToString(relation_atom) << ": " << AtomsToString(domain_atoms) << std::endl;
+      std::unordered_map<Atom, int> domain_map;
       for (const auto atom : domain_atoms) {
         domain_map.emplace(atom, domain_map.size());
       }
@@ -554,11 +586,11 @@ void DetectFactActionConnections() {
       // Fact atom
       const auto& fact_atom_term = connection_term_terms[0];
       assert(YAP_IsAtomTerm(fact_atom_term));
-      const auto fact_atom = YAP_AtomOfTerm(fact_atom_term);
+      const auto fact_atom = YapTermToAtom(fact_atom_term);
       // Action atom
       const auto& action_atom_term = connection_term_terms[1];
       assert(YAP_IsAtomTerm(action_atom_term));
-      const auto action_atom = YAP_AtomOfTerm(action_atom_term);
+      const auto action_atom = YapTermToAtom(action_atom_term);
       // Args atom
       const auto& args_term = connection_term_terms[2];
       assert(YAP_IsPairTerm(args_term));
@@ -570,12 +602,12 @@ void DetectFactActionConnections() {
         // Order relation atom
         const auto& order_relation_atom_term = terms[0];
         assert(YAP_IsAtomTerm(order_relation_atom_term));
-        const auto order_relation_atom = YAP_AtomOfTerm(order_relation_atom_term);
+        const auto order_relation_atom = YapTermToAtom(order_relation_atom_term);
       // Args atom
         // Arg pair term
         const auto& arg_pair_term = terms[1];
         const auto& pair = YapPairTermToIntPair(arg_pair_term);
-        args.push_back(std::make_pair(order_relation_atom, pair));
+        args.emplace_back(order_relation_atom, pair);
       }
       fact_action_connections.emplace(std::make_pair(fact_atom, action_atom), args);
     }
@@ -610,10 +642,10 @@ void DetectFactOrderedArgs() {
       assert(fact_term_and_ordered_args_term.size() == 2);
       const auto& fact_rel_term = fact_term_and_ordered_args_term.at(0);
       assert(YAP_IsAtomTerm(fact_rel_term));
-      const auto fact_rel_atom = YAP_AtomOfTerm(fact_rel_term);
+      const auto fact_rel_atom = YapTermToAtom(fact_rel_term);
       const auto& ordered_args_term = fact_term_and_ordered_args_term.at(1);
       const auto ordered_arg_terms = YapPairTermToYapTerms(ordered_args_term);
-      std::unordered_map<int, YAP_Atom> arg_order_rel_map;
+      std::unordered_map<int, Atom> arg_order_rel_map;
       for (const auto& ordered_arg_term : ordered_arg_terms) {
         const auto arg_term_and_order_rel_term = YapPairTermToYapTerms(ordered_arg_term);
         assert(arg_term_and_order_rel_term.size() == 2);
@@ -622,7 +654,7 @@ void DetectFactOrderedArgs() {
         const auto arg = YAP_IntOfTerm(arg_term);
         const auto& order_rel_term = arg_term_and_order_rel_term.at(1);
         assert(YAP_IsAtomTerm(order_rel_term));
-        const auto order_rel_atom = YAP_AtomOfTerm(order_rel_term);
+        const auto order_rel_atom = YapTermToAtom(order_rel_term);
         arg_order_rel_map.emplace(arg, order_rel_atom);
       }
       fact_ordered_args.emplace(fact_rel_atom, arg_order_rel_map);
@@ -654,10 +686,10 @@ void DetectActionOrderedArgs() {
       assert(action_term_and_ordered_args_term.size() == 2);
       const auto& action_rel_term = action_term_and_ordered_args_term.at(0);
       assert(YAP_IsAtomTerm(action_rel_term));
-      const auto action_rel_atom = YAP_AtomOfTerm(action_rel_term);
+      const auto action_rel_atom = YapTermToAtom(action_rel_term);
       const auto& ordered_args_term = action_term_and_ordered_args_term.at(1);
       const auto ordered_arg_terms = YapPairTermToYapTerms(ordered_args_term);
-      std::unordered_map<int, YAP_Atom> arg_order_rel_map;
+      std::unordered_map<int, Atom> arg_order_rel_map;
       for (const auto& ordered_arg_term : ordered_arg_terms) {
         const auto arg_term_and_order_rel_term = YapPairTermToYapTerms(ordered_arg_term);
         assert(arg_term_and_order_rel_term.size() == 2);
@@ -666,7 +698,7 @@ void DetectActionOrderedArgs() {
         const auto arg = YAP_IntOfTerm(arg_term);
         const auto& order_rel_term = arg_term_and_order_rel_term.at(1);
         assert(YAP_IsAtomTerm(order_rel_term));
-        const auto order_rel_atom = YAP_AtomOfTerm(order_rel_term);
+        const auto order_rel_atom = YapTermToAtom(order_rel_term);
         arg_order_rel_map.emplace(arg, order_rel_atom);
       }
       action_ordered_args.emplace(action_rel_atom, arg_order_rel_map);
@@ -681,6 +713,40 @@ void DetectActionOrderedArgs() {
     }
     std::cout << std::endl;
   }
+}
+
+void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor_atom_strs, const std::unordered_set<std::string>& non_functor_atom_strs) {
+  std::vector<std::string> sorted_functor_atom_strs;
+  sorted_functor_atom_strs.reserve(functor_atom_strs.size());
+  for (const auto& pair : functor_atom_strs) {
+    sorted_functor_atom_strs.push_back(pair.first);
+  }
+  std::sort(sorted_functor_atom_strs.begin(), sorted_functor_atom_strs.end());
+  std::vector<std::string> sorted_non_functor_atom_strs(non_functor_atom_strs.begin(), non_functor_atom_strs.end());
+  std::sort(sorted_non_functor_atom_strs.begin(), sorted_non_functor_atom_strs.end());
+  atom_to_string.clear();
+  atom_to_yap_atom.clear();
+  constexpr Atom atom_offset = 256;
+  for (const auto& atom_str : sorted_functor_atom_strs) {
+    // Assign atom id for each atom string
+    const auto atom = atom_to_string.size() + atom_offset;
+    atom_to_string.insert(AtomAndString(atom, atom_str));
+    // Paring atom id and YAP_Atom
+    const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
+    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
+    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
+  }
+  for (const auto& atom_str : sorted_non_functor_atom_strs) {
+    // Assign atom id for each atom string
+    const auto atom = atom_to_string.size() + atom_offset;
+    atom_to_string.insert(AtomAndString(atom, atom_str));
+    // Paring atom id and YAP_Atom
+    const auto atom_str_with_prefix = kAtomPrefix + atom_str;
+    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
+    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
+  }
+  // Reserved atoms
+  atom_to_string.insert(AtomAndString(atoms::kFree, "?"));
 }
 
 void Initialize(const std::string& kif, const std::string& name) {
@@ -699,12 +765,14 @@ void Initialize(const std::string& kif, const std::string& name) {
   YAP_FastInit(tmp_yap_filename.c_str());
   // Disable atom garbage collection
   YAP_SetYAPFlag(YAPC_ENABLE_AGC, 0);
+  // Now YAP Prolog is available
   const auto functor_atom_strs = sexpr_parser::CollectFunctorAtoms(nodes);
+  const auto non_functor_atom_strs = sexpr_parser::CollectNonFunctorAtoms(nodes);
+  ConstructAtomDictionary(functor_atom_strs, non_functor_atom_strs);
   atom_to_functor_arity.clear();
   for (const auto& pair : functor_atom_strs) {
-    atom_to_functor_arity.emplace(StringToFunctor(pair.first), pair.second);
+    atom_to_functor_arity.emplace(StringToAtom(pair.first), pair.second);
   }
-  const auto& non_functor_atom_strs = sexpr_parser::CollectNonFunctorAtoms(nodes);
   CacheGoalValues(non_functor_atom_strs);
   CacheConstantYapObjects();
   CacheRoles();
