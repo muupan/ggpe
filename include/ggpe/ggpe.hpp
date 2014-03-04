@@ -16,7 +16,7 @@ namespace ggpe {
 /**
  * Atom of GDL
  */
-using Atom = YAP_Atom;
+using Atom = int;
 /**
  * Tuple of GDL
  */
@@ -172,7 +172,7 @@ Atom StringToAtom(const std::string& str);
 /**
  * Convert: atom -> string representation
  */
-std::string AtomToString(const Atom atom);
+const std::string& AtomToString(const Atom atom);
 
 /**
  * Note: enabled only if 'base' relation is defined in GDL
@@ -209,6 +209,12 @@ const std::unordered_map<Atom, std::unordered_map<Atom, int>>& GetOrderedDomains
 
 void SetNextStateCachingEnabled(const bool next_state_caching_enabled);
 bool IsNextStateCachingEnabled();
+
+namespace atoms {
+
+constexpr auto kFree = 0;
+
+}
 
 }
 
