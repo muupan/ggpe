@@ -757,11 +757,15 @@ void Initialize(const std::string& kif, const std::string& name) {
   assert(!nodes.empty());
   const auto tmp_pl_filename = name + ".pl";
   const auto tmp_yap_filename = name + ".yap";
-  std::ofstream ofs(tmp_pl_filename);
-  ofs << sexpr_parser::ToProlog(nodes, true, kFunctorPrefix, kAtomPrefix, true);
-  ofs.close();
-  const auto compile_command = (boost::format("yap -g \"compile(['%s', 'interface.pl']), save_program('%s'), halt.\"") % tmp_pl_filename % tmp_yap_filename).str();
-  std::system(compile_command.c_str());
+  if (!boost::filesystem::exists(boost::filesystem::path(tmp_yap_filename))) {
+    if (!boost::filesystem::exists(boost::filesystem::path(tmp_pl_filename))) {
+      std::ofstream ofs(tmp_pl_filename);
+      ofs << sexpr_parser::ToProlog(nodes, true, kFunctorPrefix, kAtomPrefix, true);
+      ofs.close();
+    }
+    const auto compile_command = (boost::format("yap -g \"compile(['%s', 'interface.pl']), save_program('%s'), halt.\"") % tmp_pl_filename % tmp_yap_filename).str();
+    std::system(compile_command.c_str());
+  }
   YAP_FastInit(tmp_yap_filename.c_str());
   // Disable atom garbage collection
   YAP_SetYAPFlag(YAPC_ENABLE_AGC, 0);
