@@ -141,6 +141,24 @@ TEST(Atoms, TicTacToe) {
   ASSERT_EQ(AtomToString(atoms::kFree), "?");
 }
 
+TEST(GetJointActionHistory, TicTacToe) {
+  InitializeTicTacToe();
+  // Initial state
+  State initial_state;
+  ASSERT_EQ(initial_state.GetJointActionHistory().size(), 0);
+  // Second state
+  const auto first_action = JointAction({StringToTuple("(mark 1 1)"), StringToTuple("noop")});
+  const auto second_state = initial_state.GetNextState(first_action);
+  ASSERT_EQ(second_state.GetJointActionHistory().size(), 1);
+  ASSERT_EQ(second_state.GetJointActionHistory().at(0), first_action);
+  // Third state
+  const auto second_action = JointAction({StringToTuple("noop"), StringToTuple("(mark 2 2)")});
+  const auto third_state = second_state.GetNextState(second_action);
+  ASSERT_EQ(third_state.GetJointActionHistory().size(), 2);
+  ASSERT_EQ(third_state.GetJointActionHistory().at(0), first_action);
+  ASSERT_EQ(third_state.GetJointActionHistory().at(1), second_action);
+}
+
 TEST(InitializeFromFile, Breakthrough) {
   InitializeFromFile(breakthrough_filename);
   State state;

@@ -835,16 +835,16 @@ int StringToRoleIndex(const std::string& role_str) {
   return atom_to_role_index.at(StringToAtom(role_str));
 }
 
-State::State() : facts_(initial_facts), legal_actions_(0), is_terminal_(false), goals_(0) {
+State::State() : facts_(initial_facts), legal_actions_(0), is_terminal_(false), goals_(0), joint_action_history_(0) {
 }
 
-State::State(const std::vector<Tuple>& facts) : facts_(facts), legal_actions_(0), is_terminal_(false), goals_(0) {
+State::State(const std::vector<Tuple>& facts, const std::vector<JointAction>& joint_action_history) : facts_(facts), legal_actions_(0), is_terminal_(false), goals_(0), joint_action_history_(joint_action_history) {
 }
 
-State::State(const std::vector<Tuple>& facts, const std::vector<int>& goals) : facts_(facts), legal_actions_(0), is_terminal_(!goals.empty()), goals_(goals) {
+State::State(const std::vector<Tuple>& facts, const std::vector<int>& goals, const std::vector<JointAction>& joint_action_history) : facts_(facts), legal_actions_(0), is_terminal_(!goals.empty()), goals_(goals), joint_action_history_(joint_action_history) {
 }
 
-State::State(const State& another) : facts_(another.facts_), legal_actions_(another.legal_actions_), is_terminal_(another.is_terminal_), goals_(another.goals_) {
+State::State(const State& another) : facts_(another.facts_), legal_actions_(another.legal_actions_), is_terminal_(another.is_terminal_), goals_(another.goals_), joint_action_history_(another.joint_action_history_) {
 }
 
 const FactSet& State::GetFacts() const {
@@ -888,7 +888,9 @@ State State::GetNextState(const JointAction& joint_action) const {
   if (next_state_caching_enabled) {
     auto next_facts_cache = next_facts_.find(joint_action);
     if (next_facts_cache != next_facts_.end()) {
-      return State(next_facts_cache->second.first, next_facts_cache->second.second);
+      auto next_joint_action_history = joint_action_history_;
+      next_joint_action_history.push_back(joint_action);
+      return State(next_facts_cache->second.first, next_facts_cache->second.second, next_joint_action_history);
     }
   }
 #ifndef GGPE_SINGLE_THREAD
@@ -911,9 +913,13 @@ State State::GetNextState(const JointAction& joint_action) const {
     assert(pos.second);
     YAP_Reset();
     YAP_RecoverSlots(1);
-    return State(pos.first->second.first, pos.first->second.second);
+    auto next_joint_action_history = joint_action_history_;
+    next_joint_action_history.push_back(joint_action);
+    return State(pos.first->second.first, pos.first->second.second, next_joint_action_history);
   } else {
-    State next_state(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term));
+    auto next_joint_action_history = joint_action_history_;
+    next_joint_action_history.push_back(joint_action);
+    State next_state(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term), next_joint_action_history);
     YAP_Reset();
     YAP_RecoverSlots(1);
     return next_state;

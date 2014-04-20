@@ -55,11 +55,11 @@ public:
   /**
    * Construct a state with a given set of facts
    */
-  State(const FactSet& facts);
+  State(const FactSet& facts, const std::vector<JointAction>& joint_action_history);
   /**
    * Construct a state with a given set of facts, caching pre-computed goals
    */
-  State(const FactSet& facts, const std::vector<int>& goals);
+  State(const FactSet& facts, const std::vector<int>& goals, const std::vector<JointAction>& joint_action_history);
   /**
    * Copy constructor
    */
@@ -89,6 +89,12 @@ public:
    */
   std::vector<int> Simulate() const;
   /**
+   * @return joint action history from the initial state
+   */
+  const std::vector<JointAction>& GetJointActionHistory() const {
+    return joint_action_history_;
+  }
+  /**
    * @return string representation (multi-line)
    */
   std::string ToString() const;
@@ -100,6 +106,7 @@ private:
   mutable std::unordered_map<JointAction, std::pair<FactSet, Goals>, boost::hash<JointAction>> next_facts_;
   bool is_terminal_;
   mutable std::vector<int> goals_;
+  mutable std::vector<JointAction> joint_action_history_;
 };
 
 /**
