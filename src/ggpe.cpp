@@ -26,6 +26,7 @@ namespace ggpe {
 
 const auto kFunctorPrefix = std::string("f_");
 const auto kAtomPrefix = std::string("a_");
+constexpr auto kAtomOffset = 256;
 
 using Mutex = std::mutex;
 Mutex mutex;
@@ -715,6 +716,12 @@ void DetectActionOrderedArgs() {
   }
 }
 
+/**
+ * Construct atom dictionary:
+ *   atom_to_string, atom_to_yap_atom
+ * @param functor_atom_strs
+ * @param non_functor_atom_strs
+ */
 void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor_atom_strs, const std::unordered_set<std::string>& non_functor_atom_strs) {
   std::vector<std::string> sorted_functor_atom_strs;
   sorted_functor_atom_strs.reserve(functor_atom_strs.size());
@@ -726,10 +733,9 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
   std::sort(sorted_non_functor_atom_strs.begin(), sorted_non_functor_atom_strs.end());
   atom_to_string.clear();
   atom_to_yap_atom.clear();
-  constexpr Atom atom_offset = 256;
   for (const auto& atom_str : sorted_functor_atom_strs) {
     // Assign atom id for each atom string
-    const auto atom = atom_to_string.size() + atom_offset;
+    const auto atom = atom_to_string.size() + kAtomOffset;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
     const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
@@ -738,7 +744,7 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
   }
   for (const auto& atom_str : sorted_non_functor_atom_strs) {
     // Assign atom id for each atom string
-    const auto atom = atom_to_string.size() + atom_offset;
+    const auto atom = atom_to_string.size() + kAtomOffset;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
     const auto atom_str_with_prefix = kAtomPrefix + atom_str;
@@ -746,7 +752,16 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
     atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
   }
   // Reserved atoms
+  // Free atom: ?
   atom_to_string.insert(AtomAndString(atoms::kFree, "?"));
+  // Atoms relative to free atom: ?-255, ?-254, ..., ?+255
+  for (auto atom = atoms::kFree - 255; atom <= atoms::kFree + 255; ++atom) {
+    if (atom == atoms::kFree) {
+      continue;
+    }
+    const auto str = (boost::format("?%1$+d") % atom).str();
+    atom_to_string.insert(AtomAndString(atom, str));
+  }
 }
 
 void Initialize(const std::string& kif, const std::string& name) {

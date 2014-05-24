@@ -139,6 +139,10 @@ TEST(Simulate, TicTacToe) {
 TEST(Atoms, TicTacToe) {
   InitializeTicTacToe();
   ASSERT_EQ(AtomToString(atoms::kFree), "?");
+  ASSERT_EQ(AtomToString(atoms::kFree - 1), "?-1");
+  ASSERT_EQ(AtomToString(atoms::kFree - 255), "?-255");
+  ASSERT_EQ(AtomToString(atoms::kFree + 1), "?+1");
+  ASSERT_EQ(AtomToString(atoms::kFree + 255), "?+255");
 }
 
 TEST(GetJointActionHistory, TicTacToe) {
