@@ -118,7 +118,10 @@ using StateAction = std::pair<State, JointAction>;
  * Initialize GGP Engine with a given KIF string
  * This is needed before using other functionalities
  */
-void Initialize(const std::string& kif, const std::string& name="tmp");
+void Initialize(
+    const std::string& kif,
+    const bool uses_cache=false,
+    const std::string& name="tmp");
 void InitializeFromFile(const std::string& kif_filename);
 
 /**

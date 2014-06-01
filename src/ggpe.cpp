@@ -764,7 +764,10 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
   }
 }
 
-void Initialize(const std::string& kif, const std::string& name) {
+void Initialize(
+    const std::string& kif,
+    const bool uses_cache,
+    const std::string& name) {
   assert(!kif.empty());
   assert(!name.empty());
   game_name = name;
@@ -772,8 +775,8 @@ void Initialize(const std::string& kif, const std::string& name) {
   assert(!nodes.empty());
   const auto tmp_pl_filename = name + ".pl";
   const auto tmp_yap_filename = name + ".yap";
-  if (!boost::filesystem::exists(boost::filesystem::path(tmp_yap_filename))) {
-    if (!boost::filesystem::exists(boost::filesystem::path(tmp_pl_filename))) {
+  if (!uses_cache || !boost::filesystem::exists(boost::filesystem::path(tmp_yap_filename))) {
+    if (!uses_cache || !boost::filesystem::exists(boost::filesystem::path(tmp_pl_filename))) {
       std::ofstream ofs(tmp_pl_filename);
       ofs << sexpr_parser::ToProlog(nodes, true, kFunctorPrefix, kAtomPrefix, true);
       ofs.close();
@@ -819,7 +822,7 @@ std::string LoadStringFromFile(const std::string& filename) {
 
 void InitializeFromFile(const std::string& kif_filename) {
   boost::filesystem::path path(kif_filename);
-  Initialize(LoadStringFromFile(kif_filename), path.stem().string());
+  Initialize(LoadStringFromFile(kif_filename), true, path.stem().string());
 }
 
 const std::vector<Tuple>& GetPossibleFacts() {
@@ -1196,7 +1199,7 @@ void InitializeTicTacToe() {
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 )";
-  Initialize(tictactoe_kif, "tictactoe");
+  Initialize(tictactoe_kif, true, "tictactoe");
 }
 
 const std::string& GetGameName() {
