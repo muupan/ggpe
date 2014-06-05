@@ -768,6 +768,11 @@ void Initialize(
     const std::string& kif,
     const bool uses_cache,
     const std::string& name) {
+#ifndef GGPE_SINGLE_THREAD
+  std::cout << "Thread-safe mode." << std::endl;
+#else
+  std::cout << "Single-thread mode." << std::endl;
+#endif
   assert(!kif.empty());
   assert(!name.empty());
   game_name = name;
