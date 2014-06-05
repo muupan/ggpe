@@ -26,6 +26,7 @@ namespace ggpe {
 
 const auto kFunctorPrefix = std::string("f_");
 const auto kAtomPrefix = std::string("a_");
+constexpr auto kAtomOffset = 256;
 
 using Mutex = std::mutex;
 Mutex mutex;
@@ -715,6 +716,12 @@ void DetectActionOrderedArgs() {
   }
 }
 
+/**
+ * Construct atom dictionary:
+ *   atom_to_string, atom_to_yap_atom
+ * @param functor_atom_strs
+ * @param non_functor_atom_strs
+ */
 void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor_atom_strs, const std::unordered_set<std::string>& non_functor_atom_strs) {
   std::vector<std::string> sorted_functor_atom_strs;
   sorted_functor_atom_strs.reserve(functor_atom_strs.size());
@@ -726,10 +733,9 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
   std::sort(sorted_non_functor_atom_strs.begin(), sorted_non_functor_atom_strs.end());
   atom_to_string.clear();
   atom_to_yap_atom.clear();
-  constexpr Atom atom_offset = 256;
   for (const auto& atom_str : sorted_functor_atom_strs) {
     // Assign atom id for each atom string
-    const auto atom = atom_to_string.size() + atom_offset;
+    const auto atom = atom_to_string.size() + kAtomOffset;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
     const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
@@ -738,7 +744,7 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
   }
   for (const auto& atom_str : sorted_non_functor_atom_strs) {
     // Assign atom id for each atom string
-    const auto atom = atom_to_string.size() + atom_offset;
+    const auto atom = atom_to_string.size() + kAtomOffset;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
     const auto atom_str_with_prefix = kAtomPrefix + atom_str;
@@ -746,10 +752,27 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
     atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
   }
   // Reserved atoms
+  // Free atom: ?
   atom_to_string.insert(AtomAndString(atoms::kFree, "?"));
+  // Atoms relative to free atom: ?-255, ?-254, ..., ?+255
+  for (auto atom = atoms::kFree - 255; atom <= atoms::kFree + 255; ++atom) {
+    if (atom == atoms::kFree) {
+      continue;
+    }
+    const auto str = (boost::format("?%1$+d") % atom).str();
+    atom_to_string.insert(AtomAndString(atom, str));
+  }
 }
 
-void Initialize(const std::string& kif, const std::string& name) {
+void Initialize(
+    const std::string& kif,
+    const bool uses_cache,
+    const std::string& name) {
+#ifndef GGPE_SINGLE_THREAD
+  std::cout << "Thread-safe mode." << std::endl;
+#else
+  std::cout << "Single-thread mode." << std::endl;
+#endif
   assert(!kif.empty());
   assert(!name.empty());
   game_name = name;
@@ -757,8 +780,8 @@ void Initialize(const std::string& kif, const std::string& name) {
   assert(!nodes.empty());
   const auto tmp_pl_filename = name + ".pl";
   const auto tmp_yap_filename = name + ".yap";
-  if (!boost::filesystem::exists(boost::filesystem::path(tmp_yap_filename))) {
-    if (!boost::filesystem::exists(boost::filesystem::path(tmp_pl_filename))) {
+  if (!uses_cache || !boost::filesystem::exists(boost::filesystem::path(tmp_yap_filename))) {
+    if (!uses_cache || !boost::filesystem::exists(boost::filesystem::path(tmp_pl_filename))) {
       std::ofstream ofs(tmp_pl_filename);
       ofs << sexpr_parser::ToProlog(nodes, true, kFunctorPrefix, kAtomPrefix, true);
       ofs.close();
@@ -804,7 +827,7 @@ std::string LoadStringFromFile(const std::string& filename) {
 
 void InitializeFromFile(const std::string& kif_filename) {
   boost::filesystem::path path(kif_filename);
-  Initialize(LoadStringFromFile(kif_filename), path.stem().string());
+  Initialize(LoadStringFromFile(kif_filename), true, path.stem().string());
 }
 
 const std::vector<Tuple>& GetPossibleFacts() {
@@ -835,16 +858,16 @@ int StringToRoleIndex(const std::string& role_str) {
   return atom_to_role_index.at(StringToAtom(role_str));
 }
 
-State::State() : facts_(initial_facts), legal_actions_(0), is_terminal_(false), goals_(0) {
+State::State() : facts_(initial_facts), legal_actions_(0), is_terminal_(false), goals_(0), joint_action_history_(0) {
 }
 
-State::State(const std::vector<Tuple>& facts) : facts_(facts), legal_actions_(0), is_terminal_(false), goals_(0) {
+State::State(const std::vector<Tuple>& facts, const std::vector<JointAction>& joint_action_history) : facts_(facts), legal_actions_(0), is_terminal_(false), goals_(0), joint_action_history_(joint_action_history) {
 }
 
-State::State(const std::vector<Tuple>& facts, const std::vector<int>& goals) : facts_(facts), legal_actions_(0), is_terminal_(!goals.empty()), goals_(goals) {
+State::State(const std::vector<Tuple>& facts, const std::vector<int>& goals, const std::vector<JointAction>& joint_action_history) : facts_(facts), legal_actions_(0), is_terminal_(!goals.empty()), goals_(goals), joint_action_history_(joint_action_history) {
 }
 
-State::State(const State& another) : facts_(another.facts_), legal_actions_(another.legal_actions_), is_terminal_(another.is_terminal_), goals_(another.goals_) {
+State::State(const State& another) : facts_(another.facts_), legal_actions_(another.legal_actions_), is_terminal_(another.is_terminal_), goals_(another.goals_), joint_action_history_(another.joint_action_history_) {
 }
 
 const FactSet& State::GetFacts() const {
@@ -888,7 +911,9 @@ State State::GetNextState(const JointAction& joint_action) const {
   if (next_state_caching_enabled) {
     auto next_facts_cache = next_facts_.find(joint_action);
     if (next_facts_cache != next_facts_.end()) {
-      return State(next_facts_cache->second.first, next_facts_cache->second.second);
+      auto next_joint_action_history = joint_action_history_;
+      next_joint_action_history.push_back(joint_action);
+      return State(next_facts_cache->second.first, next_facts_cache->second.second, next_joint_action_history);
     }
   }
 #ifndef GGPE_SINGLE_THREAD
@@ -911,9 +936,13 @@ State State::GetNextState(const JointAction& joint_action) const {
     assert(pos.second);
     YAP_Reset();
     YAP_RecoverSlots(1);
-    return State(pos.first->second.first, pos.first->second.second);
+    auto next_joint_action_history = joint_action_history_;
+    next_joint_action_history.push_back(joint_action);
+    return State(pos.first->second.first, pos.first->second.second, next_joint_action_history);
   } else {
-    State next_state(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term));
+    auto next_joint_action_history = joint_action_history_;
+    next_joint_action_history.push_back(joint_action);
+    State next_state(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term), next_joint_action_history);
     YAP_Reset();
     YAP_RecoverSlots(1);
     return next_state;
@@ -1175,7 +1204,7 @@ void InitializeTicTacToe() {
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 )";
-  Initialize(tictactoe_kif, "tictactoe");
+  Initialize(tictactoe_kif, true, "tictactoe");
 }
 
 const std::string& GetGameName() {
