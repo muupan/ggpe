@@ -24,10 +24,14 @@
 
 namespace ggpe {
 
+namespace {
+
+// Constants
 const auto kFunctorPrefix = std::string("f_");
 const auto kAtomPrefix = std::string("a_");
 constexpr auto kAtomOffset = 256;
 
+// Global variables
 using Mutex = std::mutex;
 Mutex mutex;
 
@@ -86,12 +90,34 @@ YAP_Functor state_fact_ordered_args_functor;
 // state_action_ordered_args/1
 YAP_Functor state_action_ordered_args_functor;
 
-const std::string& AtomToString(const Atom atom) {
-  return atom_to_string.left.at(atom);
+// Utility functions
+
+template <class SuccessHandler, class FailureHandler>
+void RunWithSlot(const YAP_Term& goal, SuccessHandler success_handler, FailureHandler failure_handler) {
+  auto slot = YAP_InitSlot(goal);
+  const auto okay = YAP_RunGoalOnce(goal);
+  if (okay) {
+    success_handler(YAP_GetFromSlot(slot));
+  } else {
+    failure_handler();
+  }
+  YAP_Reset();
+  YAP_RecoverSlots(1);
 }
 
-Atom StringToAtom(const std::string& atom_str) {
-  return atom_to_string.right.at(atom_str);
+template <class SuccessHandler>
+void RunWithSlotOrError(const YAP_Term& goal, SuccessHandler success_handler) {
+  RunWithSlot(goal, success_handler, []{
+    throw std::runtime_error("RunWithSlotOrError Failure");
+  });
+}
+
+std::string LoadStringFromFile(const std::string& filename) {
+  std::ifstream ifs(filename);
+  if (!ifs) {
+    throw std::runtime_error("File '" + filename + "' does not exists.");
+  }
+  return std::string((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 }
 
 YAP_Atom AtomToYapAtom(const Atom atom) {
@@ -359,6 +385,18 @@ std::string TupleToString(const Iterator& begin, const Iterator& end) {
   }
   o << ')';
   return o.str();
+}
+
+
+} // anonymous
+
+
+const std::string& AtomToString(const Atom atom) {
+  return atom_to_string.left.at(atom);
+}
+
+Atom StringToAtom(const std::string& atom_str) {
+  return atom_to_string.right.at(atom_str);
 }
 
 std::string TupleToString(const Tuple& tuple) {
@@ -764,10 +802,30 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
   }
 }
 
-void Initialize(
-    const std::string& kif,
-    const bool uses_cache,
-    const std::string& name) {
+void InitializePrologEngine(
+    const std::vector<sexpr_parser::TreeNode>& kif_nodes) {
+  assert(!kif_nodes.empty());
+  assert(!game_name.empty());
+  const auto tmp_dir = boost::filesystem::path("tmp");
+  const auto tmp_pl_path = boost::filesystem::absolute(tmp_dir / boost::filesystem::path(game_name + ".pl"));
+  const auto tmp_yap_path = boost::filesystem::absolute(tmp_dir / boost::filesystem::path(game_name + ".yap"));
+  const auto interface_pl_path = boost::filesystem::absolute(boost::filesystem::path("interface.pl"));
+  std::ofstream ofs(tmp_pl_path.string());
+  ofs << sexpr_parser::ToProlog(kif_nodes, true, kFunctorPrefix, kAtomPrefix, true);
+  ofs.close();
+  const auto compile_command =
+      (boost::format("yap -g \"compile(['%1%', '%2%']), save_program('%3%'), halt.\"") %
+          tmp_pl_path.string() %
+          interface_pl_path.string() %
+          tmp_yap_path.string()).str();
+  std::cout << compile_command << std::endl;
+  std::system(compile_command.c_str());
+  YAP_FastInit(const_cast<char*>(tmp_yap_path.string().c_str()));
+  // Disable atom garbage collection
+  YAP_SetYAPFlag(YAPC_ENABLE_AGC, 0);
+}
+
+void Initialize(const std::string& kif, const std::string& name) {
 #ifndef GGPE_SINGLE_THREAD
   std::cout << "Thread-safe mode." << std::endl;
 #else
@@ -777,21 +835,7 @@ void Initialize(
   assert(!name.empty());
   game_name = name;
   const auto nodes = sexpr_parser::ParseKIF(kif);
-  assert(!nodes.empty());
-  const auto tmp_pl_filename = name + ".pl";
-  const auto tmp_yap_filename = name + ".yap";
-  if (!uses_cache || !boost::filesystem::exists(boost::filesystem::path(tmp_yap_filename))) {
-    if (!uses_cache || !boost::filesystem::exists(boost::filesystem::path(tmp_pl_filename))) {
-      std::ofstream ofs(tmp_pl_filename);
-      ofs << sexpr_parser::ToProlog(nodes, true, kFunctorPrefix, kAtomPrefix, true);
-      ofs.close();
-    }
-    const auto compile_command = (boost::format("yap -g \"compile(['%s', 'interface.pl']), save_program('%s'), halt.\"") % tmp_pl_filename % tmp_yap_filename).str();
-    std::system(compile_command.c_str());
-  }
-  YAP_FastInit(tmp_yap_filename.c_str());
-  // Disable atom garbage collection
-  YAP_SetYAPFlag(YAPC_ENABLE_AGC, 0);
+  InitializePrologEngine(nodes);
   // Now YAP Prolog is available
   const auto functor_atom_strs = sexpr_parser::CollectFunctorAtoms(nodes);
   const auto non_functor_atom_strs = sexpr_parser::CollectNonFunctorAtoms(nodes);
@@ -813,21 +857,10 @@ void Initialize(
 //  DetectActionOrderedArgs();
 }
 
-namespace {
-
-std::string LoadStringFromFile(const std::string& filename) {
-  std::ifstream ifs(filename);
-  if (!ifs) {
-    throw std::runtime_error("File '" + filename + "' does not exists.");
-  }
-  return std::string((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-}
-
-}
 
 void InitializeFromFile(const std::string& kif_filename) {
   boost::filesystem::path path(kif_filename);
-  Initialize(LoadStringFromFile(kif_filename), true, path.stem().string());
+  Initialize(LoadStringFromFile(kif_filename), path.stem().string());
 }
 
 const std::vector<Tuple>& GetPossibleFacts() {
@@ -1204,7 +1237,7 @@ void InitializeTicTacToe() {
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 )";
-  Initialize(tictactoe_kif, true, "tictactoe");
+  Initialize(tictactoe_kif, "tictactoe");
 }
 
 const std::string& GetGameName() {

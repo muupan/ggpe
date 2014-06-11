@@ -120,7 +120,6 @@ using StateAction = std::pair<State, JointAction>;
  */
 void Initialize(
     const std::string& kif,
-    const bool uses_cache=false,
     const std::string& name="tmp");
 void InitializeFromFile(const std::string& kif_filename);
 
