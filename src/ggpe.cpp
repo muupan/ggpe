@@ -93,7 +93,10 @@ YAP_Functor state_action_ordered_args_functor;
 // Utility functions
 
 template <class SuccessHandler, class FailureHandler>
-void RunWithSlot(const YAP_Term& goal, SuccessHandler success_handler, FailureHandler failure_handler) {
+void RunWithSlot(
+    const YAP_Term& goal,
+    SuccessHandler success_handler,
+    FailureHandler failure_handler) {
   auto slot = YAP_InitSlot(goal);
   const auto okay = YAP_RunGoalOnce(goal);
   if (okay) {
@@ -106,9 +109,12 @@ void RunWithSlot(const YAP_Term& goal, SuccessHandler success_handler, FailureHa
 }
 
 template <class SuccessHandler>
-void RunWithSlotOrError(const YAP_Term& goal, SuccessHandler success_handler) {
-  RunWithSlot(goal, success_handler, []{
-    throw std::runtime_error("RunWithSlotOrError Failure");
+void RunWithSlotOrError(
+    const YAP_Term& goal,
+    SuccessHandler success_handler,
+    const std::string& error_message="") {
+  RunWithSlot(goal, success_handler, [&]{
+    throw std::runtime_error(error_message);
   });
 }
 
@@ -467,99 +473,80 @@ void CacheRoles() {
   atom_to_role_index.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_role_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-#ifdef NDEBUG
-  YAP_RunGoalOnce(goal);
-#else
-  auto okay = YAP_RunGoalOnce(goal);
-  assert(okay && "There must be at least one role.");
-#endif
-  const auto result = YAP_GetFromSlot(slot);
-  const auto role_list_term = YAP_ArgOfTerm(1, result);
-  const auto role_terms = YapPairTermToYapTerms(role_list_term);
-  assert(!role_terms.empty() && "There must be at least one role.");
-  for (const auto role_term : role_terms) {
-    const auto role_atom = YapTermToAtom(role_term);
-    roles.push_back(role_atom);
-    role_indices.push_back(role_indices.size());
-    atom_to_role_index.emplace(role_atom, atom_to_role_index.size());
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto role_list_term = YAP_ArgOfTerm(1, result);
+    const auto role_terms = YapPairTermToYapTerms(role_list_term);
+    assert(!role_terms.empty() && "There must be at least one role.");
+    for (const auto role_term : role_terms) {
+      const auto role_atom = YapTermToAtom(role_term);
+      roles.push_back(role_atom);
+      role_indices.push_back(role_indices.size());
+      atom_to_role_index.emplace(role_atom, atom_to_role_index.size());
+    }
+  }, "There must be at least one role.");
 }
 
 void CacheInitialFacts() {
   initial_facts.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_init_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  // It is possible that there is no initial fact.
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto pair_term = YAP_ArgOfTerm(1, result);
     const auto terms = YapPairTermToYapTerms(pair_term);
     for (const auto& term : terms) {
       const auto tuple = YapTermToTuple(term);
       initial_facts.push_back(tuple);
     }
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  }, []{
+    // It is possible that there is no initial fact.
+    std::cout << "Note: no initial fact was found." << std::endl;
+  });
 }
 
 void CachePossibleFacts() {
   possible_facts.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_base_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  // It is possible that there is no initial fact.
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto pair_term = YAP_ArgOfTerm(1, result);
     const auto terms = YapPairTermToYapTerms(pair_term);
     for (const auto& term : terms) {
       const auto tuple = YapTermToTuple(term);
       possible_facts.push_back(tuple);
     }
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  }, []{
+    // 'base' relation was not found.
+    std::cout << "Note: 'base' relation was not found." << std::endl;
+  });
 }
 
 void CachePossibleActions() {
   possible_actions.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_input_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto role_actions_pairs_term = YAP_ArgOfTerm(1, result);
     possible_actions = YapPairTermToActions(role_actions_pairs_term);
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  }, []{
+    // 'input' relation was not found.
+    std::cout << "Note: 'input' relation was not found." << std::endl;
+  });
 }
 
 void DetectStepCounters() {
-  std::cout << "Detecting step counters..." << std::endl;
   step_counter_atoms.clear();
+  std::cout << "Detecting step counters..." << std::endl;
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_step_counter_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto step_counter_atoms_term = YAP_ArgOfTerm(1, result);
     assert(YAP_IsPairTerm(step_counter_atoms_term));
     const auto atoms = YapPairTermToAtoms(step_counter_atoms_term);
     std::cout << "Step counters: " << AtomsToString(atoms) << std::endl;
     step_counter_atoms.insert(atoms.begin(), atoms.end());
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  }, []{
+    std::cout << "Note: no step counter was found." << std::endl;
+  });
 }
 
 void DetectOrderedDomains() {
@@ -567,10 +554,7 @@ void DetectOrderedDomains() {
   atom_to_ordered_domain.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_ordered_domain_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto relation_domain_pairs_term = YAP_ArgOfTerm(1, result);
     const auto relation_domain_pair_terms = YapPairTermToYapTerms(relation_domain_pairs_term);
     for (const auto& relation_domain_pair_term : relation_domain_pair_terms) {
@@ -591,9 +575,9 @@ void DetectOrderedDomains() {
       }
       atom_to_ordered_domain.emplace(relation_atom, domain_map);
     }
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  }, []{
+    std::cout << "Note: no ordered domain was found." << std::endl;
+  });
 }
 
 std::pair<int, int> YapPairTermToIntPair(const YAP_Term& term) {
@@ -611,10 +595,7 @@ void DetectFactActionConnections() {
   fact_action_connections.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_fact_action_connections_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto connections_term = YAP_ArgOfTerm(1, result);
     assert(YAP_IsPairTerm(connections_term));
     const auto connection_terms = YapPairTermToYapTerms(connections_term);
@@ -650,7 +631,9 @@ void DetectFactActionConnections() {
       }
       fact_action_connections.emplace(std::make_pair(fact_atom, action_atom), args);
     }
-  }
+  }, []{
+    std::cout << "Note: no fact-action connection was found." << std::endl;
+  });
   for (const auto& entry : fact_action_connections) {
     const auto fact_atom = entry.first.first;
     const auto action_atom = entry.first.second;
@@ -662,18 +645,13 @@ void DetectFactActionConnections() {
     }
     std::cout << std::endl;
   }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
 }
 
 void DetectFactOrderedArgs() {
   fact_ordered_args.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_fact_ordered_args_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto fact_ordered_args_pairs_term = YAP_ArgOfTerm(1, result);
     const auto fact_ordered_args_pair_terms = YapPairTermToYapTerms(fact_ordered_args_pairs_term);
     for (const auto& fact_ordered_args_pair_term : fact_ordered_args_pair_terms) {
@@ -698,9 +676,9 @@ void DetectFactOrderedArgs() {
       }
       fact_ordered_args.emplace(fact_rel_atom, arg_order_rel_map);
     }
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  }, []{
+    std::cout << "Note: no ordered arguments of facts were found." << std::endl;
+  });
   for (const auto& fact_ordered_args_pair : fact_ordered_args) {
     std::cout << "Ordered args of fact " << AtomToString(fact_ordered_args_pair.first) << ':';
     for (const auto& arg_order_rel_pair : fact_ordered_args_pair.second) {
@@ -714,10 +692,7 @@ void DetectActionOrderedArgs() {
   action_ordered_args.clear();
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_action_ordered_args_functor, 1, args.data());
-  auto slot = YAP_InitSlot(goal);
-  auto okay = YAP_RunGoalOnce(goal);
-  if (okay) {
-    const auto result = YAP_GetFromSlot(slot);
+  RunWithSlot(goal, [&](const YAP_Term& result){
     const auto action_ordered_args_pairs_term = YAP_ArgOfTerm(1, result);
     const auto action_ordered_args_pair_terms = YapPairTermToYapTerms(action_ordered_args_pairs_term);
     for (const auto& action_ordered_args_pair_term : action_ordered_args_pair_terms) {
@@ -742,9 +717,9 @@ void DetectActionOrderedArgs() {
       }
       action_ordered_args.emplace(action_rel_atom, arg_order_rel_map);
     }
-  }
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  }, []{
+    std::cout << "Note: no ordered arguments of actions were found." << std::endl;
+  });
   for (const auto& action_ordered_args_pair : action_ordered_args) {
     std::cout << "Ordered args of action " << AtomToString(action_ordered_args_pair.first) << ':';
     for (const auto& arg_order_rel_pair : action_ordered_args_pair.second) {
@@ -925,18 +900,10 @@ const std::vector<std::vector<Tuple>>& State::GetLegalActions() const {
   const auto fact_term = TuplesToYapPairTerm(facts_);
   std::array<YAP_Term, 2> args = {{ fact_term, YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_legal_functor, 2, args.data());
-  auto slot = YAP_InitSlot(goal);
-#ifdef NDEBUG
-  YAP_RunGoalOnce(goal);
-#else
-  auto okay = YAP_RunGoalOnce(goal);
-  assert(okay && "Every role must always have at least one legal action.");
-#endif
-  const auto result = YAP_GetFromSlot(slot);
-  const auto role_actions_pairs_term = YAP_ArgOfTerm(2, result);
-  legal_actions_ = YapPairTermToActions(role_actions_pairs_term);
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto role_actions_pairs_term = YAP_ArgOfTerm(2, result);
+    legal_actions_ = YapPairTermToActions(role_actions_pairs_term);
+  }, "Every role must always have at least one legal action.");
   return legal_actions_;
 }
 
@@ -952,34 +919,25 @@ State State::GetNextState(const JointAction& joint_action) const {
 #ifndef GGPE_SINGLE_THREAD
   std::lock_guard<Mutex> lk(mutex);
 #endif
+  boost::optional<State> next_state;
   std::array<YAP_Term, 4> args = {{ TuplesToYapPairTerm(facts_), JointActionToYapPairTerm(joint_action), YAP_MkVarTerm(), YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_next_and_goal_functor, 4, args.data());
-  auto slot = YAP_InitSlot(goal);
-#ifdef NDEBUG
-  YAP_RunGoalOnce(goal);
-#else
-  auto okay = YAP_RunGoalOnce(goal);
-#endif
-  assert(okay);
-  const auto result = YAP_GetFromSlot(slot);
-  const auto facts_term = YAP_ArgOfTerm(3, result);
-  const auto goal_term = YAP_ArgOfTerm(4, result);
-  if (next_state_caching_enabled) {
-    const auto pos = next_facts_.emplace(joint_action, std::make_pair(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term)));
-    assert(pos.second);
-    YAP_Reset();
-    YAP_RecoverSlots(1);
-    auto next_joint_action_history = joint_action_history_;
-    next_joint_action_history.push_back(joint_action);
-    return State(pos.first->second.first, pos.first->second.second, next_joint_action_history);
-  } else {
-    auto next_joint_action_history = joint_action_history_;
-    next_joint_action_history.push_back(joint_action);
-    State next_state(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term), next_joint_action_history);
-    YAP_Reset();
-    YAP_RecoverSlots(1);
-    return next_state;
-  }
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto facts_term = YAP_ArgOfTerm(3, result);
+    const auto goal_term = YAP_ArgOfTerm(4, result);
+    if (next_state_caching_enabled) {
+      const auto pos = next_facts_.emplace(joint_action, std::make_pair(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term)));
+      assert(pos.second);
+      auto next_joint_action_history = joint_action_history_;
+      next_joint_action_history.push_back(joint_action);
+      next_state = State(pos.first->second.first, pos.first->second.second, next_joint_action_history);
+    } else {
+      auto next_joint_action_history = joint_action_history_;
+      next_joint_action_history.push_back(joint_action);
+      next_state = State(YapPairTermToTuples(facts_term), YapPairTermToGoals(goal_term), next_joint_action_history);
+    }
+  });
+  return next_state.get();
 }
 
 bool State::IsTerminal() const {
@@ -997,19 +955,11 @@ const std::vector<int>& State::GetGoals() const {
   const auto fact_term = TuplesToYapPairTerm(facts_);
   std::array<YAP_Term, 2> args = {{ fact_term, YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_goal_functor, 2, args.data());
-  auto slot = YAP_InitSlot(goal);
-#ifdef NDEBUG
-  YAP_RunGoalOnce(goal);
-#else
-  auto okay = YAP_RunGoalOnce(goal);
-  assert(okay);
-#endif
-  const auto result = YAP_GetFromSlot(slot);
-  const auto role_goal_pairs_term = YAP_ArgOfTerm(2, result);
-  goals_ = YapPairTermToGoals(role_goal_pairs_term);
-  assert(!goals_.empty());
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto role_goal_pairs_term = YAP_ArgOfTerm(2, result);
+    goals_ = YapPairTermToGoals(role_goal_pairs_term);
+    assert(!goals_.empty());
+  });
   return goals_;
 }
 
@@ -1020,18 +970,11 @@ std::vector<int> State::Simulate() const {
   const auto fact_term = TuplesToYapPairTerm(facts_);
   std::array<YAP_Term, 2> args = {{ fact_term, YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_simulate_functor, 2, args.data());
-  auto slot = YAP_InitSlot(goal);
-#ifdef NDEBUG
-  YAP_RunGoalOnce(goal);
-#else
-  auto okay = YAP_RunGoalOnce(goal);
-  assert(okay && "Simulation must always succeed.");
-#endif
-  const auto result = YAP_GetFromSlot(slot);
-  const auto role_goal_pairs_term = YAP_ArgOfTerm(2, result);
-  const auto goals = YapPairTermToGoals(role_goal_pairs_term);
-  YAP_Reset();
-  YAP_RecoverSlots(1);
+  Goals goals;
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto role_goal_pairs_term = YAP_ArgOfTerm(2, result);
+    goals = YapPairTermToGoals(role_goal_pairs_term);
+  });
   return goals;
 }
 
