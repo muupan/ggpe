@@ -15,10 +15,12 @@ lib/libggp.so
 bin/test
 *.ggp
 *.pl
-!interface.pl
+!/interface.pl
 *.kif
 !/test/tictactoe.kif
 !/test/breakthrough.kif
+!/sample/breakthrough.kif
+!/sample/skirmish.kif
 *.yap
 stanford
 games
