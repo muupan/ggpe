@@ -57,6 +57,7 @@ std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, int>>>, 
 std::unordered_map<Atom, std::unordered_map<int, Atom>> fact_ordered_args;
 std::unordered_map<Atom, std::unordered_map<int, Atom>> action_ordered_args;
 bool next_state_caching_enabled = false;
+std::string game_kif = "";
 
 // []
 YAP_Term empty_list_term;
@@ -809,6 +810,11 @@ void Initialize(const std::string& kif, const std::string& name) {
   assert(!kif.empty());
   assert(!name.empty());
   game_name = name;
+  if (game_kif == kif) {
+    // Nothing to do
+    return;
+  }
+  game_kif = kif;
   const auto nodes = sexpr_parser::ParseKIF(kif);
   InitializePrologEngine(nodes);
   // Now YAP Prolog is available
