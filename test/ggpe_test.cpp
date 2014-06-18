@@ -45,7 +45,7 @@ TEST(Role, TicTacToe) {
 
 TEST(InitialState, TicTacToe) {
   InitializeTicTacToe();
-  State state;
+  auto state = CreateInitialState();
   ASSERT_FALSE(state.IsTerminal());
   const auto& facts = state.GetFacts();
   ASSERT_EQ(facts.size(), 10);
@@ -69,7 +69,7 @@ TEST(InitialState, TicTacToe) {
 
 TEST(GetLegalAction, TicTacToe) {
   InitializeTicTacToe();
-  State state;
+  auto state = CreateInitialState();
   ASSERT_EQ(state.GetLegalActions().size(), 2);
   const auto actions_for_white = state.GetLegalActions().at(0);
   ASSERT_EQ(actions_for_white.size(), 9);
@@ -101,7 +101,7 @@ TEST(GetLegalAction, TicTacToe) {
 
 TEST(GetNextState, TicTacToe) {
   InitializeTicTacToe();
-  State state;
+  auto state = CreateInitialState();
   JointAction joint_action({StringToTuple("(mark 2 2)"), StringToTuple("noop")});
   const auto next_state = state.GetNextState(joint_action);
   const auto next_facts = next_state.GetFacts();
@@ -128,12 +128,12 @@ TEST(GetNextState, TicTacToe) {
 
 TEST(Simulate, TicTacToe) {
   InitializeTicTacToe();
-  State state;
+  auto state = CreateInitialState();
   state.Simulate();
   SetNextStateCachingEnabled(true);
-  SimpleSimulate(State());
+  SimpleSimulate(CreateInitialState());
   SetNextStateCachingEnabled(false);
-  SimpleSimulate(State());
+  SimpleSimulate(CreateInitialState());
 }
 
 TEST(Atoms, TicTacToe) {
@@ -148,7 +148,7 @@ TEST(Atoms, TicTacToe) {
 TEST(GetJointActionHistory, TicTacToe) {
   InitializeTicTacToe();
   // Initial state
-  State initial_state;
+  auto initial_state = CreateInitialState();
   ASSERT_EQ(initial_state.GetJointActionHistory().size(), 0);
   // Second state
   const auto first_action = JointAction({StringToTuple("(mark 1 1)"), StringToTuple("noop")});
@@ -165,7 +165,7 @@ TEST(GetJointActionHistory, TicTacToe) {
 
 TEST(InitializeFromFile, Breakthrough) {
   InitializeFromFile(breakthrough_filename);
-  State state;
+  auto state = CreateInitialState();
   ASSERT_FALSE(state.IsTerminal());
   ASSERT_TRUE(GetRoleCount() == 2);
   ASSERT_TRUE(StringToRoleIndex("white") == 0);
@@ -175,9 +175,9 @@ TEST(InitializeFromFile, Breakthrough) {
   state.GetLegalActions();
   state.Simulate();
   SetNextStateCachingEnabled(true);
-  SimpleSimulate(State());
+  SimpleSimulate(CreateInitialState());
   SetNextStateCachingEnabled(false);
-  SimpleSimulate(State());
+  SimpleSimulate(CreateInitialState());
 }
 
 }
