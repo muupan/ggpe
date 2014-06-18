@@ -872,9 +872,6 @@ int StringToRoleIndex(const std::string& role_str) {
   return atom_to_role_index.at(StringToAtom(role_str));
 }
 
-State::State() : facts_(initial_facts), legal_actions_(0), is_terminal_(false), goals_(0), joint_action_history_(0) {
-}
-
 State::State(const std::vector<Tuple>& facts, const std::vector<JointAction>& joint_action_history) : facts_(facts), legal_actions_(0), is_terminal_(false), goals_(0), joint_action_history_(joint_action_history) {
 }
 
@@ -1191,6 +1188,10 @@ void InitializeTicTacToe() {
 
 const std::string& GetGameName() {
   return game_name;
+}
+
+State CreateInitialState() {
+  return State(initial_facts, std::vector<JointAction>());
 }
 
 }

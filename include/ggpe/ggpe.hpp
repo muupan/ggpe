@@ -48,10 +48,7 @@ using Goals = std::vector<int>;
  */
 class State {
 public:
-  /**
-   * Construct an initial state
-   */
-  State();
+  State() = delete;
   /**
    * Construct a state with a given set of facts
    */
@@ -213,6 +210,8 @@ const std::unordered_map<Atom, std::unordered_map<Atom, int>>& GetOrderedDomains
 
 void SetNextStateCachingEnabled(const bool next_state_caching_enabled);
 bool IsNextStateCachingEnabled();
+
+State CreateInitialState();
 
 namespace atoms {
 
