@@ -13,7 +13,7 @@ T SelectRandomly(const std::vector<T>& vector) {
 }
 
 void SimulateOnce() {
-  auto tmp_state = ggpe::State();
+  auto tmp_state = ggpe::CreateInitialState();
   while (!tmp_state.IsTerminal()) {
     ggpe::JointAction joint_action;
     for (const auto role_idx : ggpe::GetRoleIndices()) {
