@@ -21,6 +21,7 @@
 #include <glog/logging.h>
 
 #include "sexpr_parser.hpp"
+#include "file_utils.hpp"
 
 namespace ggpe {
 
@@ -58,6 +59,7 @@ std::unordered_map<Atom, std::unordered_map<int, Atom>> fact_ordered_args;
 std::unordered_map<Atom, std::unordered_map<int, Atom>> action_ordered_args;
 bool next_state_caching_enabled = false;
 std::string game_kif = "";
+bool game_enables_tabling = false;
 
 // []
 YAP_Term empty_list_term;
@@ -106,7 +108,11 @@ void RunWithSlot(
     failure_handler();
   }
   YAP_Reset();
+#ifdef _YAPDEFS_H // YAP 6.3
+  YAP_RecoverSlots(1, slot);
+#else // YAP 6.2
   YAP_RecoverSlots(1);
+#endif
 }
 
 template <class SuccessHandler>
@@ -117,14 +123,6 @@ void RunWithSlotOrError(
   RunWithSlot(goal, success_handler, [&]{
     throw std::runtime_error(error_message);
   });
-}
-
-std::string LoadStringFromFile(const std::string& filename) {
-  std::ifstream ifs(filename);
-  if (!ifs) {
-    throw std::runtime_error("File '" + filename + "' does not exists.");
-  }
-  return std::string((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 }
 
 YAP_Atom AtomToYapAtom(const Atom atom) {
@@ -778,30 +776,76 @@ void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor
   }
 }
 
-void InitializePrologEngine(
-    const std::vector<sexpr_parser::TreeNode>& kif_nodes) {
-  assert(!kif_nodes.empty());
-  assert(!game_name.empty());
-  const auto tmp_dir = boost::filesystem::path("tmp");
-  const auto tmp_pl_path = boost::filesystem::absolute(tmp_dir / boost::filesystem::path(game_name + ".pl"));
-  const auto tmp_yap_path = boost::filesystem::absolute(tmp_dir / boost::filesystem::path(game_name + ".yap"));
-  const auto interface_pl_path = boost::filesystem::absolute(boost::filesystem::path("interface.pl"));
-  std::ofstream ofs(tmp_pl_path.string());
-  ofs << sexpr_parser::ToProlog(kif_nodes, true, kFunctorPrefix, kAtomPrefix, true);
-  ofs.close();
-  const auto compile_command =
-      (boost::format("yap -g \"compile(['%1%', '%2%']), save_program('%3%'), halt.\"") %
-          tmp_pl_path.string() %
-          interface_pl_path.string() %
-          tmp_yap_path.string()).str();
-  std::cout << compile_command << std::endl;
-  std::system(compile_command.c_str());
-  YAP_FastInit(const_cast<char*>(tmp_yap_path.string().c_str()));
+//void LoadPrologFile(const std::string& filename) {
+//  YAP_Term err;
+//  auto goal = YAP_ReadBuffer(
+//      (boost::format("compile('%1%')") %
+//          tmp_pl_path.string()).str().c_str(), &err);
+//  YAP_RunGoalOnce(goal);
+//}
+
+void RunGoalOnce(const std::string& query) {
+  YAP_Term err;
+  auto goal = YAP_ReadBuffer(query.c_str(), &err);
+  auto slot = YAP_InitSlot(goal);
+  YAP_RunGoalOnce(goal);
+  YAP_Reset();
+#ifdef _YAPDEFS_H // YAP 6.3
+  YAP_RecoverSlots(1, slot);
+#else // YAP 6.2
+  YAP_RecoverSlots(1);
+#endif
+}
+
+void CompilePrologFile(const std::string& prolog_filename) {
+  RunGoalOnce((boost::format("compile('%1%')") % prolog_filename).str());
+}
+
+void InitializePrologEngineWithInterface() {
+  const auto interface_binary_path =
+      boost::filesystem::absolute(boost::filesystem::path("interface.yap"));
+  if (!boost::filesystem::exists(interface_binary_path)) {
+    const auto interface_prolog_path =
+        boost::filesystem::absolute(boost::filesystem::path("interface.pl"));
+    const auto compile_command =
+        (boost::format("yap -z \"compile('%1%'), save_program('%2%'), halt\"") %
+            interface_prolog_path.string() %
+            interface_binary_path.string()).str();
+    std::cout << compile_command << std::endl;
+    std::system(compile_command.c_str());
+  }
+  assert(boost::filesystem::exists(boost::filesystem::path("interface.yap")));
+  YAP_FastInit("interface.yap");
   // Disable atom garbage collection
   YAP_SetYAPFlag(YAPC_ENABLE_AGC, 0);
 }
 
-void Initialize(const std::string& kif, const std::string& name) {
+void InitializePrologEngine(
+    const std::vector<sexpr_parser::TreeNode>& kif_nodes,
+    const bool enables_tabling) {
+  assert(!kif_nodes.empty());
+  assert(!game_name.empty());
+  InitializePrologEngineWithInterface();
+  const auto tmp_dir = boost::filesystem::path("tmp");
+  const auto game_prolog_path =
+      boost::filesystem::absolute(
+          tmp_dir / boost::filesystem::path(game_name + ".pl"));
+  std::ofstream ofs(game_prolog_path.string());
+  ofs << sexpr_parser::ToProlog(
+      kif_nodes,
+      true,
+      kFunctorPrefix,
+      kAtomPrefix,
+      true,
+      enables_tabling);
+  ofs.close();
+  CompilePrologFile(game_prolog_path.string());
+}
+
+void Initialize(
+    const std::string& kif,
+    const std::string& name,
+    const bool enables_tabling) {
 #ifndef GGPE_SINGLE_THREAD
   std::cout << "Thread-safe mode." << std::endl;
 #else
@@ -810,13 +854,14 @@ void Initialize(const std::string& kif, const std::string& name) {
   assert(!kif.empty());
   assert(!name.empty());
   game_name = name;
-  if (game_kif == kif) {
+  if (game_kif == kif && game_enables_tabling == enables_tabling) {
     // Nothing to do
     return;
   }
   game_kif = kif;
+  game_enables_tabling = enables_tabling;
   const auto nodes = sexpr_parser::ParseKIF(kif);
-  InitializePrologEngine(nodes);
+  InitializePrologEngine(nodes, enables_tabling);
   // Now YAP Prolog is available
   const auto functor_atom_strs = sexpr_parser::CollectFunctorAtoms(nodes);
   const auto non_functor_atom_strs = sexpr_parser::CollectNonFunctorAtoms(nodes);
@@ -836,12 +881,20 @@ void Initialize(const std::string& kif, const std::string& name) {
   DetectFactActionConnections();
 //  DetectFactOrderedArgs();
 //  DetectActionOrderedArgs();
+  if (enables_tabling) {
+    RunGoalOnce("tabling_statistics");
+  }
 }
 
 
-void InitializeFromFile(const std::string& kif_filename) {
+void InitializeFromFile(
+    const std::string& kif_filename,
+    const bool enables_tabling) {
   boost::filesystem::path path(kif_filename);
-  Initialize(LoadStringFromFile(kif_filename), path.stem().string());
+  Initialize(
+      file_utils::LoadStringFromFile(kif_filename),
+      path.stem().string(),
+      enables_tabling);
 }
 
 const std::vector<Tuple>& GetPossibleFacts() {

@@ -122,17 +122,24 @@ public:
   std::unordered_set<std::string> CollectNonFunctorAtoms() const;
 
   /**
+   * Collect negated relations (relations that occurs inside negation).
+   * @return
+   */
+   void CollectNegatedFunctors(std::unordered_map<std::string, int>& output) const;
+
+  /**
    * Collect functor atoms and their argument numbers from this node and its
    * children.
    * @return
    */
   std::unordered_map<std::string, int> CollectFunctorAtoms() const;
+  void CollectFunctorAtoms(std::unordered_map<std::string, int>& output) const;
 
   std::unordered_map<std::string, std::unordered_set<ArgPos>> CollectVariableArgs() const;
   std::unordered_set<ArgPosPair> CollectSameDomainArgsInBody() const;
   std::unordered_set<ArgPosPair> CollectSameDomainArgsBetweenHeadAndBody() const;
   TreeNode ReplaceAtoms(const std::string& before, const std::string& after) const;
-  bool CollectLocalRelations(std::unordered_set<std::string>& local_relation_functors) const;
+  bool CollectDynamicRelations(std::unordered_set<std::string>& local_relation_functors) const;
   const std::string& GetFunctor() const;
 
   /**
@@ -151,11 +158,36 @@ private:
 std::string RemoveComments(const std::string& sexpr);
 std::vector<TreeNode> Parse(const std::string& sexpr, const bool flatten_tuple_with_one_child = false);
 std::vector<TreeNode> ParseKIF(const std::string& kif);
-std::string ToProlog(const std::vector<TreeNode>& nodes, const bool quotes_atoms, const std::string& functor_prefix = "", const std::string& atom_prefix = "", const bool adds_helper_clauses = false);
+std::string ToProlog(
+    const std::vector<TreeNode>& nodes,
+    const bool quotes_atoms,
+    const std::string& functor_prefix = "",
+    const std::string& atom_prefix = "",
+    const bool adds_helper_clauses = false,
+    const bool enables_tabling = false);
 std::unordered_set<std::string> CollectAtoms(const std::vector<TreeNode>& nodes);
 std::unordered_set<std::string> CollectNonFunctorAtoms(const std::vector<TreeNode>& nodes);
 std::unordered_map<std::string, int> CollectFunctorAtoms(const std::vector<TreeNode>& nodes);
 std::vector<TreeNode> ReplaceAtoms(const std::vector<TreeNode>& nodes, const std::string& before, const std::string& after);
+
+/**
+ * Collect all dynamic relations, including reserved ones.
+ * Dynamic relations depend on 'true' and/or 'does' directly or indirectly.
+ * @param nodes
+ * @return
+ */
+std::unordered_set<std::string> CollectDynamicRelations(
+    const std::vector<TreeNode>& nodes);
+
+/**
+ * Collect all static relations, not including reserved ones.
+ * Static relations do not depend on 'true' nor 'does', thus their evaluation
+ * results can be safely cached.
+ * @param nodes
+ * @return
+ */
+std::unordered_map<std::string, int> CollectStaticRelations(
+    const std::vector<TreeNode>& nodes);
 
 }
 

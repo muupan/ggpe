@@ -6,6 +6,7 @@
 #include <locale>
 #include <sstream>
 
+#include <boost/format.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/regex.hpp>
 #include <boost/tokenizer.hpp>
@@ -25,7 +26,9 @@ namespace sexpr_parser {
 typedef boost::char_separator<char> Separator;
 typedef boost::tokenizer<Separator> Tokenizer;
 
-const std::unordered_set<std::string> reserved_words = {
+namespace {
+
+const std::unordered_set<std::string> kReservedRelations = {
   "role",
   "init",
   "true",
@@ -41,19 +44,41 @@ const std::unordered_set<std::string> reserved_words = {
   "distinct"
 };
 
+/**
+ * These relations is dynamic.
+ * true and does: asserted and retracted by users dynamically.
+ * legal, next, terminal and goal: depends on true and/or does.
+ */
+const std::unordered_set<std::string> kReservedDynamicRelations = {
+    "true",
+    "does",
+    "legal",
+    "next",
+    "terminal",
+    "goal"
+};
+
 std::string ToLowerCase(const std::string& str) {
   auto lowered = str;
   std::transform(lowered.begin(), lowered.end(), lowered.begin(), ::tolower);
   return lowered;
 }
 
+/**
+ * If a given string is a reserved, return it in lower cases. Otherwise,
+ * return it as it is.
+ * @param word
+ * @return
+ */
 std::string LowerReservedWords(const std::string& word) {
   const auto lowered = ToLowerCase(word);
-  if (reserved_words.count(lowered)) {
+  if (kReservedRelations.count(lowered)) {
     return lowered;
   } else {
     return word;
   }
+}
+
 }
 
 TreeNode::TreeNode(const std::string& value) :
@@ -269,28 +294,29 @@ std::unordered_set<std::string> TreeNode::CollectNonFunctorAtoms() const {
   }
 }
 
-std::unordered_map<std::string, int> TreeNode::CollectFunctorAtoms() const {
+void TreeNode::CollectFunctorAtoms(
+    std::unordered_map<std::string, int>& output) const {
   if (is_leaf_) {
-    // Not compound term
-    return std::unordered_map<std::string, int>();
+    return;
   } else {
     // Compound term
     assert(children_.size() >= 2  && "Compound term must have a functor and one or more arguments.");
     assert(children_.front().IsLeaf() && "Compound term must start with functor.");
-    std::unordered_map<std::string, int> values;
     // Functor
     if (children_.front().GetValue() != "<=") {
-      values.emplace(children_.front().GetValue(), children_.size() - 1);
+      output.emplace(children_.front().GetValue(), children_.size() - 1);
     }
     // Search compound term arguments
     for (auto i = children_.begin() + 1; i != children_.end(); ++i) {
-      if (!i->IsLeaf()) {
-        const auto& child_atoms = i->CollectFunctorAtoms();
-        values.insert(child_atoms.begin(), child_atoms.end());
-      }
+      i->CollectFunctorAtoms(output);
     }
-    return values;
   }
+}
+
+std::unordered_map<std::string, int> TreeNode::CollectFunctorAtoms() const {
+  std::unordered_map<std::string, int> tmp;
+  CollectFunctorAtoms(tmp);
+  return tmp;
 }
 
 std::unordered_map<std::string, std::unordered_set<ArgPos>> TreeNode::CollectVariableArgs() const {
@@ -441,7 +467,8 @@ TreeNode TreeNode::ReplaceAtoms(const std::string& before, const std::string& af
   }
 }
 
-bool TreeNode::CollectLocalRelations(std::unordered_set<std::string>& local_relations) const {
+bool TreeNode::CollectDynamicRelations(
+    std::unordered_set<std::string>& local_relations) const {
   if (is_leaf_) {
     return false;
   }
@@ -507,6 +534,22 @@ bool TreeNode::operator==(const TreeNode& another) const {
   }
 }
 
+void TreeNode::CollectNegatedFunctors(
+    std::unordered_map<std::string, int>& output) const {
+  if (is_leaf_) {
+    return;
+  } else {
+    if (GetFunctor() == "not") {
+      assert(children_.size() == 2);
+      children_.back().CollectFunctorAtoms(output);
+    } else {
+      for (const auto& child : children_) {
+        child.CollectNegatedFunctors(output);
+      }
+    }
+  }
+}
+
 std::string RemoveComments(const std::string& sexpr) {
   boost::regex comment(";.*?$");
   return boost::regex_replace(sexpr, comment, std::string());
@@ -566,21 +609,53 @@ std::unordered_set<std::string> CollectNonGroundRelations(const std::vector<Tree
   return non_grounds;
 }
 
+std::string GenerateUserDefinedFunctorClauses(
+    const std::unordered_map<std::string, int>& functors,
+    const bool quotes_atoms,
+    const std::string& functor_prefix) {
+  std::ostringstream o;
+  for (const auto& functor_arity_pair : functors) {
+    if (kReservedRelations.count(functor_arity_pair.first)) {
+      continue;
+    }
+    const auto functor_atom =
+        ConvertToPrologFunctor(
+            functor_arity_pair.first,
+            quotes_atoms,
+            functor_prefix);
+    o << "user_defined_functor(" << functor_atom << ", " << functor_arity_pair.second << ")." << std::endl;
+  }
+  return o.str();
+}
+
+std::string GenerateTableClauses(
+    const std::vector<TreeNode>& nodes,
+    const bool quotes_atoms,
+    const std::string& functor_prefix) {
+  std::ostringstream o;
+  const auto static_relations = CollectStaticRelations(nodes);
+  for (const auto& functor_arity_pair : static_relations) {
+    const auto functor_atom =
+        ConvertToPrologFunctor(
+            functor_arity_pair.first,
+            quotes_atoms,
+            functor_prefix);
+    o << boost::format(":- table %1%/%2%.") %
+        functor_atom %
+        functor_arity_pair.second << std::endl;
+  }
+  return o.str();
+}
+
 std::string GeneratePrologHelperClauses(
     const std::vector<TreeNode>& nodes,
     const bool quotes_atoms,
     const std::string& functor_prefix,
     const std::string& atom_prefix) {
   std::ostringstream o;
-  // User defined functors
   const auto functors = CollectFunctorAtoms(nodes);
-  for (const auto& functor_arity_pair : functors) {
-    if (reserved_words.count(functor_arity_pair.first)) {
-      continue;
-    }
-    const auto functor_atom = ConvertToPrologFunctor(functor_arity_pair.first, quotes_atoms, functor_prefix);
-    o << "user_defined_functor(" << functor_atom << ", " << functor_arity_pair.second << ")." << std::endl;
-  }
+  // User defined functors
+  o << GenerateUserDefinedFunctorClauses(functors, quotes_atoms, functor_prefix);
   // Same domain args
   std::unordered_set<ArgPosPair> same_domain_args_pairs_in_body;
   std::unordered_set<ArgPosPair> same_domain_args_pairs_between_head_and_body;
@@ -612,7 +687,7 @@ std::string GeneratePrologHelperClauses(
   // Non-ground relations
   const auto non_grounds = CollectNonGroundRelations(nodes);
   for (const auto& non_ground : non_grounds) {
-    if (reserved_words.count(non_ground)) {
+    if (kReservedRelations.count(non_ground)) {
       continue;
     }
     auto atom = non_ground;
@@ -634,8 +709,12 @@ std::string ToProlog(
     const bool quotes_atoms,
     const std::string& functor_prefix,
     const std::string& atom_prefix,
-    const bool adds_helper_clauses) {
+    const bool adds_helper_clauses,
+    const bool enables_tabling) {
   std::ostringstream o;
+  if (enables_tabling) {
+    o << GenerateTableClauses(nodes, quotes_atoms, functor_prefix);
+  }
   for (const auto& node : nodes) {
     o << node.ToPrologClause(quotes_atoms, functor_prefix, atom_prefix) << std::endl;
   }
@@ -663,11 +742,11 @@ std::unordered_set<std::string> CollectNonFunctorAtoms(const std::vector<TreeNod
   return values;
 }
 
-std::unordered_map<std::string, int> CollectFunctorAtoms(const std::vector<TreeNode>& nodes) {
+std::unordered_map<std::string, int> CollectFunctorAtoms(
+    const std::vector<TreeNode>& nodes) {
   std::unordered_map<std::string, int> values;
   for (const auto& node : nodes) {
-    const auto& node_values = node.CollectFunctorAtoms();
-    values.insert(node_values.begin(), node_values.end());
+    node.CollectFunctorAtoms(values);
   }
   return values;
 }
@@ -680,17 +759,89 @@ std::vector<TreeNode> ReplaceAtoms(const std::vector<TreeNode>& nodes, const std
   return new_nodes;
 }
 
-std::unordered_set<std::string> CollectLocalRelations(const std::vector<TreeNode>& nodes) {
-  std::unordered_set<std::string> local_relations = { "f_true", "f_does", "f_legal", "a_terminal", "f_goal" };
+std::unordered_set<std::string> CollectClauseHeadRelations(
+    const std::vector<TreeNode>& nodes) {
+  std::unordered_set<std::string> head_relations;
+  for (const auto& node : nodes) {
+    if (node.GetFunctor() == "<=") {
+      head_relations.emplace(node.GetChildren()[1].GetFunctor());
+    } else {
+      head_relations.emplace(node.GetFunctor());
+    }
+  }
+  return head_relations;
+}
+
+std::unordered_map<std::string, int> CollectNegatedFunctors(
+    const std::vector<TreeNode>& nodes) {
+  std::unordered_map<std::string, int> negated_relations;
+  for (const auto& node : nodes) {
+    node.CollectNegatedFunctors(negated_relations);
+  }
+  return negated_relations;
+}
+
+std::unordered_set<std::string> CollectDynamicRelations(
+    const std::vector<TreeNode>& nodes) {
+  auto dynamic_relations = kReservedDynamicRelations; // copy
   while (true) {
+    auto found = false;
     for (const auto& node : nodes) {
-      if (node.CollectLocalRelations(local_relations)) {
-        continue;
+      if (node.CollectDynamicRelations(dynamic_relations)) {
+        // If a new dynamic relation is found, restart the search again
+        // so that we can find relations depending on the newly found relation.
+        found = true;
       }
     }
-    break;
+    if (!found) {
+      break;
+    }
   }
-  return local_relations;
+  return dynamic_relations;
 }
+
+std::unordered_map<std::string, int> CollectStaticRelations(
+    const std::vector<TreeNode>& nodes) {
+  const auto dynamic_relations = CollectDynamicRelations(nodes);
+  const auto head_relations = CollectClauseHeadRelations(nodes);
+  const auto functors = CollectFunctorAtoms(nodes);
+  const auto negated_functors = CollectNegatedFunctors(nodes);
+  std::unordered_map<std::string, int> global_relations;
+  for (const auto& rel : head_relations) {
+    if (!kReservedRelations.count(rel) &&
+        !dynamic_relations.count(rel) &&
+        !negated_functors.count(rel)) {
+//      if (functor.first == "cell" || functor.first == "control" || functor.first == "mark") {
+//        continue;
+//      }
+//      if (functor.first == "index" || functor.first == "cellHolds" || functor.first == "control" || functor.first == "move") {
+//        continue;
+//      }
+//      auto allowed = std::unordered_set<std::string>{{
+////        "countplus",
+////        "horizontal",
+////        "diagonalup",
+////        "scoremap",
+////        "pp",
+////        "diagonaldown",
+////        "kingmove",
+////        "distinctcell",
+////        "cell",
+////        "knightmove",
+////        "owns",
+////        "vertical",
+////        "file",
+////        "rank",
+//        "type"
+//      }};
+//      if (!allowed.count(rel)) {
+//        continue;
+//      }
+      global_relations.emplace(rel, functors.at(rel));
+    }
+  }
+  return global_relations;
+}
+
 
 }

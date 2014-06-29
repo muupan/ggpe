@@ -117,8 +117,11 @@ using StateAction = std::pair<State, JointAction>;
  */
 void Initialize(
     const std::string& kif,
-    const std::string& name="tmp");
-void InitializeFromFile(const std::string& kif_filename);
+    const std::string& name="tmp",
+    const bool enables_tabling=false);
+void InitializeFromFile(
+    const std::string& kif_filename,
+    const bool enables_tabling=false);
 
 /**
  * Initialize GGP Engine with TicTacToe KIF string.

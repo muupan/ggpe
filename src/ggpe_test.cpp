@@ -21,8 +21,8 @@ void SimpleSimulate(const State& state) {
   }
 }
 
-const auto tictactoe_filename = "test/tictactoe.kif";
-const auto breakthrough_filename = "test/breakthrough.kif";
+const auto tictactoe_filename = "kif/tictactoe.kif";
+const auto breakthrough_filename = "kif/breakthrough.kif";
 
 }
 
