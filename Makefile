@@ -17,13 +17,13 @@ CXX_FILES := $(shell find src \( -name \*.cpp -or -name \*.cc \) -print)
 CXX_TEST_FILES := $(shell find src \( -name \*_test.cpp -or -name \*_test.cc \) -print)
 CXX_NONTEST_FILES := $(filter-out $(CXX_TEST_FILES), $(CXX_FILES))
 SRCS := $(CXX_NONTEST_FILES)
-OBJS := $(shell echo $(SRCS) | perl -p -e 's/.(cpp|cc)/.o/g')
+OBJS := $(shell echo $(SRCS) | perl -p -e 's/\.(cpp|cc)/\.o/g')
 TARGET := lib/libggpe.a
 
 # Macros for test
 CXXFLAGS_TEST := $(CXXFLAGS_DEBUG) -I./test -DGTEST_USE_OWN_TR1_TUPLE
 SRCS_TEST := gtest/gtest_main.cc gtest/gtest-all.cc $(filter-out src/main.cpp, $(CXX_FILES))
-OBJS_TEST := $(shell echo $(SRCS_TEST) | perl -p -e 's/.(cpp|cc)/.o/g')
+OBJS_TEST := $(shell echo $(SRCS_TEST) | perl -p -e 's/\.(cpp|cc)/\.o/g')
 TARGET_TEST := bin/test
 
 # "make release" or just "make" means release build
