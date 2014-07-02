@@ -24,5 +24,7 @@ bin/test
 *.yap
 stanford
 games
+gdlcc
 lib/*
+tmp/*
 !.gitkeep
