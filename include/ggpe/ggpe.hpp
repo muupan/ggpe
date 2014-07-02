@@ -13,6 +13,12 @@
 
 namespace ggpe {
 
+namespace atoms {
+
+constexpr auto kFree = 0;
+
+}
+
 /**
  * Atom of GDL
  */
@@ -43,73 +49,13 @@ using ActionSet = std::vector<Action>;
 using JointAction = std::vector<Action>;
 using Goals = std::vector<int>;
 
-/**
- * A game state with manipulation interface
- */
-class State {
-public:
-  State() = delete;
-  /**
-   * Construct a state with a given set of facts
-   */
-  State(const FactSet& facts, const std::vector<JointAction>& joint_action_history);
-  /**
-   * Construct a state with a given set of facts, caching pre-computed goals
-   */
-  State(const FactSet& facts, const std::vector<int>& goals, const std::vector<JointAction>& joint_action_history);
-  /**
-   * Copy constructor
-   */
-  State(const State& another);
-  /**
-   * @return a set of facts
-   */
-  const FactSet& GetFacts() const;
-  /**
-   * @return a set of legal actions for each role (results are cached)
-   */
-  const std::vector<ActionSet>& GetLegalActions() const;
-  /**
-   * @return the next state when performing a given joint action
-   */
-  State GetNextState(const JointAction& joint_action) const;
-  /**
-   * @return true iif this state is terminal
-   */
-  bool IsTerminal() const;
-  /**
-   * @return a goal value for each role if defined, otherwise empty
-   */
-  const std::vector<int>& GetGoals() const;
-  /**
-   * @return resulting goals of a random simulation from this state
-   */
-  std::vector<int> Simulate() const;
-  /**
-   * @return joint action history from the initial state
-   */
-  const std::vector<JointAction>& GetJointActionHistory() const {
-    return joint_action_history_;
-  }
-  /**
-   * @return string representation (multi-line)
-   */
-  std::string ToString() const;
-  bool operator==(const State& another) const;
-  bool operator!=(const State& another) const;
-private:
-  FactSet facts_;
-  mutable std::vector<ActionSet> legal_actions_;
-  mutable std::unordered_map<JointAction, std::pair<FactSet, Goals>, boost::hash<JointAction>> next_facts_;
-  bool is_terminal_;
-  mutable std::vector<int> goals_;
-  mutable std::vector<JointAction> joint_action_history_;
-};
+class State;
+using StateSp = std::shared_ptr<State>;
 
 /**
  * A pair of state and joint action
  */
-using StateAction = std::pair<State, JointAction>;
+using StateAction = std::pair<StateSp, JointAction>;
 
 /**
  * Initialize GGP Engine with a given KIF string
@@ -211,28 +157,21 @@ const std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, in
  */
 const std::unordered_map<Atom, std::unordered_map<Atom, int>>& GetOrderedDomains();
 
-void SetNextStateCachingEnabled(const bool next_state_caching_enabled);
-bool IsNextStateCachingEnabled();
-
-State CreateInitialState();
-
-namespace atoms {
-
-constexpr auto kFree = 0;
+StateSp CreateInitialState();
 
 }
 
-}
+#include "state.hpp"
 
-namespace std {
-
-template <>
-struct hash<ggpe::State> {
-  size_t operator()(const ggpe::State& value) const {
-    return boost::hash_value(value.GetFacts());
-  }
-};
-
-}
+//namespace std {
+//
+//template <>
+//struct hash<ggpe::State> {
+//  size_t operator()(const ggpe::State& value) const {
+//    return boost::hash_value(value.GetFacts());
+//  }
+//};
+//
+//}
 
 #endif /* _GGPE_H_ */
