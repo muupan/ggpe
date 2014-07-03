@@ -23,6 +23,7 @@
 #include "sexpr_parser.hpp"
 #include "file_utils.hpp"
 #include "yap_engine.hpp"
+#include "gdlcc_engine.hpp"
 
 namespace ggpe {
 
@@ -50,6 +51,9 @@ std::unordered_map<Atom, std::unordered_map<int, Atom>> fact_ordered_args;
 std::unordered_map<Atom, std::unordered_map<int, Atom>> action_ordered_args;
 std::string game_kif = "";
 bool game_enables_tabling = false;
+bool is_yap_engine_initialized = false;
+bool is_gdlcc_engine_initialized = false;
+std::shared_ptr<std::thread> gdlcc_thread = nullptr;
 
 template <class Iterator>
 std::string TupleToString(const Iterator& begin, const Iterator& end) {
@@ -124,12 +128,43 @@ void Initialize(
     const std::string& kif,
     const std::string& name,
     const bool enables_tabling) {
+  assert(!kif.empty());
+  assert(!name.empty());
+  game_name = name;
+  if (game_kif == kif && game_enables_tabling == enables_tabling) {
+    // Nothing to do
+    return;
+  }
+  game_kif = kif;
+  game_enables_tabling = enables_tabling;
+  gdlcc_thread = nullptr;
+  is_yap_engine_initialized = false;
+  is_gdlcc_engine_initialized = false;
 #ifndef GGPE_SINGLE_THREAD
   std::cout << "Thread-safe mode." << std::endl;
 #else
   std::cout << "Single-thread mode." << std::endl;
 #endif
+
+  // Initialize yap engine
   yap::InitializeYapEngine(kif, name, enables_tabling);
+  is_yap_engine_initialized = true;
+  std::cout << "Initialized yap engine." << std::endl;
+
+  // Initialize gdlcc engine
+  gdlcc_thread = std::make_shared<std::thread>([=, &is_gdlcc_engine_initialized]{
+    try {
+      gdlcc::InitializeGDLCCEngine(kif, name, true);
+      is_gdlcc_engine_initialized = true;
+      std::cout << "Initialized gdlcc engine." << std::endl;
+    } catch (std::exception& e) {
+      std::cerr << e.what() << std::endl;
+    } catch (...) {
+      std::cerr << "some exception" << std::endl;
+    }
+  });
+//  gdlcc_thread->join();
+  gdlcc_thread->detach();
 }
 
 void InitializeFromFile(
@@ -365,7 +400,11 @@ const std::string& GetGameName() {
 }
 
 StateSp CreateInitialState() {
-  return yap::CreateInitialState();
+//  if (is_gdlcc_engine_initialized) {
+//    return gdlcc::CreateInitialState();
+//  } else {
+    return yap::CreateInitialState();
+//  }
 }
 
 }

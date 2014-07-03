@@ -788,20 +788,8 @@ void InitializeYapEngine(
     const std::string& kif,
     const std::string& name,
     const bool enables_tabling) {
-#ifndef GGPE_SINGLE_THREAD
-  std::cout << "Thread-safe mode." << std::endl;
-#else
-  std::cout << "Single-thread mode." << std::endl;
-#endif
   assert(!kif.empty());
   assert(!name.empty());
-  game_name = name;
-  if (game_kif == kif && game_enables_tabling == enables_tabling) {
-    // Nothing to do
-    return;
-  }
-  game_kif = kif;
-  game_enables_tabling = enables_tabling;
   const auto nodes = sexpr_parser::ParseKIF(kif);
   InitializePrologEngine(nodes, enables_tabling);
   // Now YAP Prolog is available

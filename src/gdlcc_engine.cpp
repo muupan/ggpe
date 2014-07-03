@@ -9,6 +9,7 @@
 #include "ggpe.hpp"
 
 namespace ggpe {
+
 namespace gdlcc {
 
 namespace fs = boost::filesystem;
@@ -71,8 +72,8 @@ void Link(const std::string& lib_path) {
 }
 
 void Delink() {
-  lib = nullptr;
   dlclose(lib);
+  lib = nullptr;
 }
 
 Tuple StrToTuple(const std::string& str) {
@@ -143,6 +144,9 @@ void InitializeGDLCCEngine(
     const std::string& kif,
     const std::string& name,
     const bool reuses_existing_lib) {
+  if (lib) {
+    Delink();
+  }
   const auto tmp_dir = std::string("tmp/");
   const auto kif_filename = tmp_dir + name + ".kif";
   const auto cpp_filename = tmp_dir + name + ".cpp";
@@ -156,7 +160,7 @@ void InitializeGDLCCEngine(
     std::cout << "Old files exist." << std::endl;
     std::ifstream ifs(kif_filename);
     std::string old_kif((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-    std::cout << "Old KIF file: " << old_kif << std::endl;
+//    std::cout << "Old KIF file: " << old_kif << std::endl;
     if (kif == old_kif) {
       std::cout << "Reuse old shared library:" << lib_filename << std::endl;
       gdlcc::Link(lib_filename);
