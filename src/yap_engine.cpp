@@ -149,6 +149,7 @@ YAP_Atom AtomToYapAtom(const Atom atom) {
 }
 
 Atom YapAtomToAtom(const YAP_Atom yap_atom) {
+  std::cout << "yap_atom:" << YAP_AtomName(yap_atom) << std::endl;
   return atom_to_yap_atom.right.at(yap_atom);
 }
 
@@ -673,35 +674,64 @@ void DetectActionOrderedArgs() {
  * @param functor_atom_strs
  * @param non_functor_atom_strs
  */
-void ConstructAtomDictionary(const std::unordered_map<std::string, int>& functor_atom_strs, const std::unordered_set<std::string>& non_functor_atom_strs) {
-  std::vector<std::string> sorted_functor_atom_strs;
-  sorted_functor_atom_strs.reserve(functor_atom_strs.size());
-  for (const auto& pair : functor_atom_strs) {
-    sorted_functor_atom_strs.push_back(pair.first);
-  }
-  std::sort(sorted_functor_atom_strs.begin(), sorted_functor_atom_strs.end());
-  std::vector<std::string> sorted_non_functor_atom_strs(non_functor_atom_strs.begin(), non_functor_atom_strs.end());
-  std::sort(sorted_non_functor_atom_strs.begin(), sorted_non_functor_atom_strs.end());
+void ConstructAtomDictionary(
+    const std::unordered_map<std::string, int>& functor_atom_strs,
+    const std::unordered_set<std::string>& non_functor_atom_strs) {
   atom_to_string.clear();
   atom_to_yap_atom.clear();
-  for (const auto& atom_str : sorted_functor_atom_strs) {
+  std::set<std::string> sorted_atom_strs;
+  for (const auto& pair : functor_atom_strs) {
+    sorted_atom_strs.insert(pair.first);
+  }
+  sorted_atom_strs.insert(
+      non_functor_atom_strs.begin(),
+      non_functor_atom_strs.end());
+  for (const auto& atom_str : sorted_atom_strs) {
     // Assign atom id for each atom string
     const auto atom = atom_to_string.size() + kAtomOffset;
+    std::cout << atom_str << ": " << atom << std::endl;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
-    const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
-    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
-    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
+    if (non_functor_atom_strs.count(atom_str)) {
+      // Non-functor atoms
+      const auto atom_str_with_prefix = kAtomPrefix + atom_str;
+      const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
+      atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
+    } else if (functor_atom_strs.count(atom_str)) {
+      // Functor atoms
+      const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
+      const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
+      atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
+    }
   }
-  for (const auto& atom_str : sorted_non_functor_atom_strs) {
-    // Assign atom id for each atom string
-    const auto atom = atom_to_string.size() + kAtomOffset;
-    atom_to_string.insert(AtomAndString(atom, atom_str));
-    // Paring atom id and YAP_Atom
-    const auto atom_str_with_prefix = kAtomPrefix + atom_str;
-    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
-    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
-  }
+//  std::vector<std::string> sorted_functor_atom_strs;
+//  sorted_functor_atom_strs.reserve(functor_atom_strs.size());
+//  for (const auto& pair : functor_atom_strs) {
+//    sorted_functor_atom_strs.push_back(pair.first);
+//  }
+//  std::sort(sorted_functor_atom_strs.begin(), sorted_functor_atom_strs.end());
+//  std::vector<std::string> sorted_non_functor_atom_strs(non_functor_atom_strs.begin(), non_functor_atom_strs.end());
+//  std::sort(sorted_non_functor_atom_strs.begin(), sorted_non_functor_atom_strs.end());
+//  atom_to_string.clear();
+//  atom_to_yap_atom.clear();
+//  for (const auto& atom_str : sorted_functor_atom_strs) {
+//    // Assign atom id for each atom string
+//    const auto atom = atom_to_string.size() + kAtomOffset;
+//    atom_to_string.insert(AtomAndString(atom, atom_str));
+//    // Paring atom id and YAP_Atom
+//    const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
+//    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
+//    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
+//  }
+//  for (const auto& atom_str : sorted_non_functor_atom_strs) {
+//    // Assign atom id for each atom string
+//    const auto atom = atom_to_string.size() + kAtomOffset;
+//    atom_to_string.insert(AtomAndString(atom, atom_str));
+//    // Paring atom id and YAP_Atom
+//    const auto atom_str_with_prefix = kAtomPrefix + atom_str;
+//    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
+//    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
+//  }
   // Reserved atoms
   // Free atom: ?
   atom_to_string.insert(AtomAndString(atoms::kFree, "?"));

@@ -17,6 +17,11 @@ void InitializeGDLCCEngine(
     const std::string& name,
     const bool reuses_existing_lib);
 
+bool InitializeGDLCCEngineOrFalse(
+    const std::string& kif,
+    const std::string& name,
+    const bool reuses_existing_lib);
+
 StateSp CreateInitialState();
 
 }

@@ -27,4 +27,6 @@ games
 gdlcc
 lib/*
 tmp/*
+kif/*.cpp
+kif/*.h
 !.gitkeep

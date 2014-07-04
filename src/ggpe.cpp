@@ -152,19 +152,16 @@ void Initialize(
   std::cout << "Initialized yap engine." << std::endl;
 
   // Initialize gdlcc engine
-  gdlcc_thread = std::make_shared<std::thread>([=, &is_gdlcc_engine_initialized]{
-    try {
-      gdlcc::InitializeGDLCCEngine(kif, name, true);
-      is_gdlcc_engine_initialized = true;
+//  gdlcc_thread = std::make_shared<std::thread>([=, &is_gdlcc_engine_initialized]{
+    if (gdlcc::InitializeGDLCCEngineOrFalse(kif, name, true)) {
       std::cout << "Initialized gdlcc engine." << std::endl;
-    } catch (std::exception& e) {
-      std::cerr << e.what() << std::endl;
-    } catch (...) {
-      std::cerr << "some exception" << std::endl;
+      is_gdlcc_engine_initialized = true;
+    } else {
+      std::cout << "Failed to initialize gdlcc engine." << std::endl;
     }
-  });
+//  });
 //  gdlcc_thread->join();
-  gdlcc_thread->detach();
+//  gdlcc_thread->detach();
 }
 
 void InitializeFromFile(
@@ -400,11 +397,11 @@ const std::string& GetGameName() {
 }
 
 StateSp CreateInitialState() {
-//  if (is_gdlcc_engine_initialized) {
-//    return gdlcc::CreateInitialState();
-//  } else {
+  if (is_gdlcc_engine_initialized) {
+    return gdlcc::CreateInitialState();
+  } else {
     return yap::CreateInitialState();
-//  }
+  }
 }
 
 }

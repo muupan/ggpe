@@ -112,7 +112,8 @@ void ConvertKifToCpp(const std::string& kif_filename) {
       kif_filename).str();
   std::cout << "Command: " << convert_command << std::endl;
   const auto ret = std::system(convert_command.c_str());
-  if (ret != 0 || errno != 0) {
+  if (ret != 0) {
+//  if (ret != 0 || errno != 0) {
     throw std::runtime_error("Failed to convert KIF into C++.");
   }
 }
@@ -127,13 +128,14 @@ void CompileCppIntoSharedLibrary(
   const auto optimization_options = std::string("-O0 -g");
 #endif
   const auto compile_command =
-      (boost::format("g++ -std=c++11 %1% -I./include -I. %2% -shared -fPIC -o %3%") %
+      (boost::format("$CXX -std=c++11 %1% -I./include -I. %2% -shared -fPIC -o %3%") %
           optimization_options %
           cpp_filename %
           lib_filename).str();
   std::cout << "Command: " << compile_command << std::endl;
   const auto ret = std::system(compile_command.c_str());
-  if (ret != 0 || errno != 0) {
+//  if (ret != 0 || errno != 0) {
+  if (ret != 0) {
     throw std::runtime_error("Failed to compile generated C++.");
   }
 }
@@ -171,6 +173,22 @@ void InitializeGDLCCEngine(
   ConvertKifToCpp(kif_filename);
   CompileCppIntoSharedLibrary(cpp_filename, lib_filename);
   gdlcc::Link(lib_filename);
+}
+
+bool InitializeGDLCCEngineOrFalse(
+    const std::string& kif,
+    const std::string& name,
+    const bool reuses_existing_lib) {
+  try {
+    InitializeGDLCCEngine(kif, name, true);
+    return true;
+  } catch (std::exception& e) {
+    std::cerr << e.what() << std::endl;
+    return false;
+  } catch (...) {
+    std::cerr << "some exception" << std::endl;
+    return false;
+  }
 }
 
 StateSp CreateInitialState() {
