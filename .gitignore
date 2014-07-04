@@ -29,4 +29,5 @@ lib/*
 tmp/*
 kif/*.cpp
 kif/*.h
+sample/tmp/*
 !.gitkeep
