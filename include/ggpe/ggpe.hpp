@@ -57,6 +57,10 @@ using StateSp = std::shared_ptr<State>;
  */
 using StateAction = std::pair<StateSp, JointAction>;
 
+enum class EngineBackend {
+  YAP, GDLCC
+};
+
 /**
  * Initialize GGP Engine with a given KIF string
  * This is needed before using other functionalities
@@ -64,16 +68,18 @@ using StateAction = std::pair<StateSp, JointAction>;
 void Initialize(
     const std::string& kif,
     const std::string& name="tmp",
+    const EngineBackend backend=EngineBackend::YAP,
     const bool enables_tabling=false);
 void InitializeFromFile(
     const std::string& kif_filename,
+    const EngineBackend backend=EngineBackend::YAP,
     const bool enables_tabling=false);
 
 /**
  * Initialize GGP Engine with TicTacToe KIF string.
  * This is intended for testing functionalities.
  */
-void InitializeTicTacToe();
+void InitializeTicTacToe(const EngineBackend backend=EngineBackend::YAP);
 
 const std::string& GetGameName();
 
@@ -158,6 +164,12 @@ const std::unordered_map<AtomPair, std::vector<std::pair<Atom, std::pair<int, in
 const std::unordered_map<Atom, std::unordered_map<Atom, int>>& GetOrderedDomains();
 
 StateSp CreateInitialState();
+
+/**
+ * Get the path where GGPE was compiled
+ * @return
+ */
+std::string GetGGPEPath();
 
 }
 

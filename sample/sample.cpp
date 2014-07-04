@@ -15,12 +15,12 @@ T SelectRandomly(const std::vector<T>& vector) {
 
 void SimulateOnce() {
   auto tmp_state = ggpe::CreateInitialState();
-  while (!tmp_state.IsTerminal()) {
+  while (!tmp_state->IsTerminal()) {
     ggpe::JointAction joint_action;
     for (const auto role_idx : ggpe::GetRoleIndices()) {
-      joint_action.push_back(SelectRandomly(tmp_state.GetLegalActions()[role_idx]));
+      joint_action.push_back(SelectRandomly(tmp_state->GetLegalActions()[role_idx]));
     }
-    tmp_state = tmp_state.GetNextState(joint_action);
+    tmp_state = tmp_state->GetNextState(joint_action);
   }
 }
 
@@ -43,10 +43,13 @@ int main(int argc, char** argv) {
   }
   const auto kif_file = std::string(argv[1]);
   const auto simulation_count = boost::lexical_cast<int>(argv[2]);
-  std::cout << "Without tabling:" << std::endl;
-  ggpe::InitializeFromFile(kif_file, false);
+  std::cout << "GDLCC:" << std::endl;
+  ggpe::InitializeFromFile(kif_file, ggpe::EngineBackend::GDLCC);
   EvaluateSimulationSpeed(simulation_count);
-  std::cout << "With tabling:" << std::endl;
-  ggpe::InitializeFromFile(kif_file, true);
+  std::cout << "YAP without tabling:" << std::endl;
+  ggpe::InitializeFromFile(kif_file, ggpe::EngineBackend::YAP, false);
+  EvaluateSimulationSpeed(simulation_count);
+  std::cout << "YAP with tabling:" << std::endl;
+  ggpe::InitializeFromFile(kif_file, ggpe::EngineBackend::YAP, true);
   EvaluateSimulationSpeed(simulation_count);
 }

@@ -149,7 +149,6 @@ YAP_Atom AtomToYapAtom(const Atom atom) {
 }
 
 Atom YapAtomToAtom(const YAP_Atom yap_atom) {
-  std::cout << "yap_atom:" << YAP_AtomName(yap_atom) << std::endl;
   return atom_to_yap_atom.right.at(yap_atom);
 }
 
@@ -689,7 +688,7 @@ void ConstructAtomDictionary(
   for (const auto& atom_str : sorted_atom_strs) {
     // Assign atom id for each atom string
     const auto atom = atom_to_string.size() + kAtomOffset;
-    std::cout << atom_str << ": " << atom << std::endl;
+//    std::cout << atom_str << ": " << atom << std::endl;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
     if (non_functor_atom_strs.count(atom_str)) {
@@ -772,11 +771,12 @@ void CompilePrologFile(const std::string& prolog_filename) {
 
 void InitializePrologEngineWithInterface() {
   const auto interface_binary_path =
-      boost::filesystem::absolute(boost::filesystem::path("interface.yap"));
+      boost::filesystem::absolute(
+          boost::filesystem::path("tmp/interface.yap"));
   if (!boost::filesystem::exists(interface_binary_path)) {
-
     const auto interface_prolog_path =
-        boost::filesystem::absolute(boost::filesystem::path("interface.pl"));
+        boost::filesystem::absolute(
+            boost::filesystem::path(GetGGPEPath() + "/interface.pl"));
     const auto compile_command =
         (boost::format("yap -z \"compile('%1%'), save_program('%2%'), halt\"") %
             interface_prolog_path.string() %
@@ -784,8 +784,8 @@ void InitializePrologEngineWithInterface() {
     std::cout << compile_command << std::endl;
     std::system(compile_command.c_str());
   }
-  assert(boost::filesystem::exists(boost::filesystem::path("interface.yap")));
-  YAP_FastInit("interface.yap");
+  assert(boost::filesystem::exists(interface_binary_path));
+  YAP_FastInit(interface_binary_path.c_str());
   // Disable atom garbage collection
   YAP_SetYAPFlag(YAPC_ENABLE_AGC, 0);
 }

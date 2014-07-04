@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <fstream>
+#include <iostream>
 #include <stdexcept>
 #include <dlfcn.h>
 #include <boost/format.hpp>
@@ -108,7 +109,8 @@ void SaveKifFile(const std::string& kif_filename, const std::string& kif) {
  * <name>.kif -> <name>.cpp and <name>.h
  */
 void ConvertKifToCpp(const std::string& kif_filename) {
-  const auto convert_command = (boost::format("./gdlcc %1%") %
+  const auto convert_command = (boost::format("%1%/gdlcc %2%") %
+      GetGGPEPath() %
       kif_filename).str();
   std::cout << "Command: " << convert_command << std::endl;
   const auto ret = std::system(convert_command.c_str());
@@ -127,9 +129,11 @@ void CompileCppIntoSharedLibrary(
 #else
   const auto optimization_options = std::string("-O0 -g");
 #endif
+  const auto ggpe_include_path = GetGGPEPath() + "/include";
   const auto compile_command =
-      (boost::format("$CXX -std=c++11 %1% -I./include -I. %2% -shared -fPIC -o %3%") %
+      (boost::format("$CXX -std=c++11 %1% -I%2% -I./ %3% -shared -fPIC -o %4%") %
           optimization_options %
+          ggpe_include_path %
           cpp_filename %
           lib_filename).str();
   std::cout << "Command: " << compile_command << std::endl;

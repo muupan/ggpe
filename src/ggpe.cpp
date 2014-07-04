@@ -51,9 +51,9 @@ std::unordered_map<Atom, std::unordered_map<int, Atom>> fact_ordered_args;
 std::unordered_map<Atom, std::unordered_map<int, Atom>> action_ordered_args;
 std::string game_kif = "";
 bool game_enables_tabling = false;
+EngineBackend engine_backend;
 bool is_yap_engine_initialized = false;
 bool is_gdlcc_engine_initialized = false;
-std::shared_ptr<std::thread> gdlcc_thread = nullptr;
 
 template <class Iterator>
 std::string TupleToString(const Iterator& begin, const Iterator& end) {
@@ -127,17 +127,20 @@ Tuple StringToTuple(const std::string& str) {
 void Initialize(
     const std::string& kif,
     const std::string& name,
+    const EngineBackend backend,
     const bool enables_tabling) {
   assert(!kif.empty());
   assert(!name.empty());
   game_name = name;
-  if (game_kif == kif && game_enables_tabling == enables_tabling) {
+  if (game_kif == kif &&
+      engine_backend == backend &&
+      game_enables_tabling == enables_tabling) {
     // Nothing to do
     return;
   }
   game_kif = kif;
+  engine_backend = backend;
   game_enables_tabling = enables_tabling;
-  gdlcc_thread = nullptr;
   is_yap_engine_initialized = false;
   is_gdlcc_engine_initialized = false;
 #ifndef GGPE_SINGLE_THREAD
@@ -152,25 +155,25 @@ void Initialize(
   std::cout << "Initialized yap engine." << std::endl;
 
   // Initialize gdlcc engine
-//  gdlcc_thread = std::make_shared<std::thread>([=, &is_gdlcc_engine_initialized]{
+  if (backend == EngineBackend::GDLCC) {
     if (gdlcc::InitializeGDLCCEngineOrFalse(kif, name, true)) {
       std::cout << "Initialized gdlcc engine." << std::endl;
       is_gdlcc_engine_initialized = true;
     } else {
       std::cout << "Failed to initialize gdlcc engine." << std::endl;
     }
-//  });
-//  gdlcc_thread->join();
-//  gdlcc_thread->detach();
+  }
 }
 
 void InitializeFromFile(
     const std::string& kif_filename,
+    const EngineBackend backend,
     const bool enables_tabling) {
   boost::filesystem::path path(kif_filename);
   Initialize(
       file_utils::LoadStringFromFile(kif_filename),
       path.stem().string(),
+      backend,
       enables_tabling);
 }
 
@@ -229,7 +232,7 @@ const std::unordered_map<Atom, std::unordered_map<Atom, int>>& GetOrderedDomains
   return atom_to_ordered_domain;
 }
 
-void InitializeTicTacToe() {
+void InitializeTicTacToe(const EngineBackend backend) {
   const std::string tictactoe_kif = R"(
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Tictactoe
@@ -389,7 +392,7 @@ void InitializeTicTacToe() {
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 )";
-  Initialize(tictactoe_kif, "tictactoe");
+  Initialize(tictactoe_kif, "tictactoe", backend);
 }
 
 const std::string& GetGameName() {
@@ -402,6 +405,14 @@ StateSp CreateInitialState() {
   } else {
     return yap::CreateInitialState();
   }
+}
+
+std::string GetGGPEPath() {
+#ifdef GGPE_PATH
+  return GGPE_PATH;
+#else
+  static_assert(false, "GGPE_PATH macro must be defined at compile time.");
+#endif
 }
 
 }
