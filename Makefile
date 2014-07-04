@@ -45,6 +45,7 @@ all: $(OBJS) interface.yap
 .PHONY: test
 test: CXXFLAGS += $(CXXFLAGS_TEST)
 test: $(OBJS_TEST) interface.yap
+	rm -rf tmp/*
 	$(CXX) $(CXXFLAGS) -o $(TARGET_TEST) $(OBJS_TEST) $(LDFLAGS) $(LIBS)
 	./$(TARGET_TEST)
 
