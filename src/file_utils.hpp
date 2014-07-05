@@ -9,6 +9,7 @@
 #define FILE_UTILS_HPP_
 
 #include <fstream>
+#include <stdexcept>
 
 namespace file_utils {
 

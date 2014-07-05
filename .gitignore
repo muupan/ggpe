@@ -14,9 +14,9 @@
 lib/libggp.so
 bin/test
 *.ggp
+*.log
 *.pl
 !/interface.pl
-*.kif
 !/test/tictactoe.kif
 !/test/breakthrough.kif
 !/sample/breakthrough.kif
@@ -24,5 +24,10 @@ bin/test
 *.yap
 stanford
 games
+gdlcc
 lib/*
+tmp/*
+kif/*.cpp
+kif/*.h
+sample/tmp/*
 !.gitkeep

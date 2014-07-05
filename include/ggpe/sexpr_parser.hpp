@@ -127,6 +127,20 @@ public:
    */
    void CollectNegatedFunctors(std::unordered_map<std::string, int>& output) const;
 
+//   void CollectVariables(std::unordered_set<std::string>& output) const;
+   void CollectVariables(
+       const std::unordered_set<std::string>& ignored,
+       std::unordered_set<std::string>& output) const;
+  void CollectBoundAndUnboundVariables(
+      std::unordered_set<std::string>& bound_variables,
+      std::unordered_set<std::string>& unbound_variables) const;
+//    void CollectUnboundVariables(
+//        const std::unordered_set<std::string>& bound_vairables,
+//        std::unordered_set<std::string>& output) const;
+
+   bool ChangeBodyOrderSoThatAllVariablesAreBound();
+   bool IsImplication() const;
+
   /**
    * Collect functor atoms and their argument numbers from this node and its
    * children.
@@ -150,9 +164,9 @@ public:
   bool ContainsFunctors(const std::unordered_set<std::string>& functors) const;
   bool operator==(const TreeNode& another) const;
 private:
-  const bool is_leaf_;
-  const std::string value_;
-  const std::vector<TreeNode> children_;
+  bool is_leaf_;
+  std::string value_;
+  std::vector<TreeNode> children_;
 };
 
 std::string RemoveComments(const std::string& sexpr);
