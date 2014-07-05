@@ -23,6 +23,7 @@ void SimpleSimulate(const StateSp& state) {
 
 const auto tictactoe_filename = "kif/tictactoe.kif";
 const auto breakthrough_filename = "kif/breakthrough.kif";
+const auto pilgrimage_filename = "kif/pilgrimage.kif";
 
 }
 
@@ -171,6 +172,22 @@ TEST(InitializeFromFile, Breakthrough) {
   ASSERT_TRUE(facts.size() == 33);
   state->GetLegalActions();
   state->Simulate();
+  SimpleSimulate(CreateInitialState());
+}
+
+TEST(InitializeFromFile, Pilgrimage) {
+  InitializeFromFile(pilgrimage_filename);
+  auto state = CreateInitialState();
+  std::cout << state->ToString() << std::endl;
+  ASSERT_FALSE(state->IsTerminal());
+  ASSERT_EQ(GetRoleCount(), 2);
+  ASSERT_EQ(StringToRoleIndex("red"), 0);
+  ASSERT_EQ(StringToRoleIndex("blue"), 1);
+  ASSERT_EQ(state->GetFacts().size(), 9);
+  ASSERT_EQ(state->GetLegalActions()[0].size(), 3);
+  ASSERT_EQ(state->GetLegalActions()[1].size(), 10);
+  state->Simulate();
+  std::cout << "AA" << std::endl;
   SimpleSimulate(CreateInitialState());
 }
 
