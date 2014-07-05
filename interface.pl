@@ -459,11 +459,20 @@ atom_lt(_a, _b) :-
 %indirectly_connected_args(_rel1, _arg1, _rel2, _arg2) :-
 %    indirectly_connected_args(_rel1, _arg1, _rel2, _arg2, _).
     
+fact_arg_values_triplets(_fact_arg_values_triplets) :-
+    memo_fact_arg_values_triplets(_fact_arg_values_triplets), !.
+fact_arg_values_triplets(_fact_arg_values_triplets) :-
+    state_base(_facts),
+    all([_fact_rel, _arg, _values], (fact_relation(_fact_rel), extract_facts(_fact_rel, _facts, _rel_facts), functor_arg_index(_fact_rel, _arg), all(_value, (member(_fact, _rel_facts), arg(_arg, _fact, _value)), _values)), _fact_arg_values_triplets),
+    assertz(memo_fact_arg_values_triplets(_fact_arg_values_triplets)).
    
 fact_arg_values(_fact_rel, _arg, _values) :-
-    state_base(_facts),
-    extract_facts(_fact_rel, _facts, _rel_facts),
-    all(_value, (member(_fact, _rel_facts), arg(_arg, _fact, _value)), _values).
+    fact_arg_values_triplets(_fact_arg_values_triplets),
+    member([_fact_rel, _arg, _values], _fact_arg_values_triplets).
+% fact_arg_values(_fact_rel, _arg, _values) :-
+%     state_base(_facts),
+%     extract_facts(_fact_rel, _facts, _rel_facts),
+%     all(_value, (member(_fact, _rel_facts), arg(_arg, _fact, _value)), _values).
     
 fact_arg_ordered_domain(_fact_rel, _arg, _order_rel) :-
     ordered_domain(_order_rel, _domain),
@@ -472,12 +481,23 @@ fact_arg_ordered_domain(_fact_rel, _arg, _order_rel) :-
     %print(_fact_rel),write(' arg:'),print(_arg),write(' values:'),print(_values),nl,
     forall(member(_value, _values), member(_value, _domain)).
     
-action_arg_values(_action_rel, _arg, _values) :-
+action_arg_values_triplets(_action_arg_values_triplets) :-
+    memo_action_values_triplets(_action_arg_values_triplets), !.
+action_arg_values_triplets(_action_arg_values_triplets) :-
     state_input_only_actions(_actions),
-    %write('actions:'),print(_actions),nl,
-    extract_actions(_action_rel, _actions, _rel_actions),
-    %write('rel_actions:'),print(_rel_actions),nl,
-    all(_value, (member(_action, _rel_actions), arg(_arg, _action, _value)), _values).
+    all([_action_rel, _arg, _values], (action_relation(_action_rel), extract_actions(_action_rel, _actions, _rel_actions), functor_arg_index(_action_rel, _arg), all(_value, (member(_action, _rel_actions), arg(_arg, _action, _value)), _values)), _action_arg_values_triplets),
+    assertz(memo_action_values_triplets(_action_arg_values_triplets)).
+
+action_arg_values(_action_rel, _arg, _values) :-
+    action_arg_values_triplets(_action_arg_values_triplets),
+    member([_action_rel, _arg, _values], _action_arg_values_triplets).
+
+% action_arg_values(_action_rel, _arg, _values) :-
+%     state_input_only_actions(_actions),
+%     %write('actions:'),print(_actions),nl,
+%     extract_actions(_action_rel, _actions, _rel_actions),
+%     %write('rel_actions:'),print(_rel_actions),nl,
+%     all(_value, (member(_action, _rel_actions), arg(_arg, _action, _value)), _values).
     
 action_arg_ordered_domain(_action_rel, _arg, _order_rel) :-
     ordered_domain(_order_rel, _domain),
