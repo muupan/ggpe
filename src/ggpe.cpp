@@ -40,7 +40,6 @@ std::vector<int> role_indices;
 std::unordered_map<Atom, int> atom_to_role_index;
 std::unordered_map<Atom, int> atom_to_functor_arity;
 std::unordered_map<Atom, int> atom_to_goal_values;
-std::unordered_map<std::string, int> functor_name_to_arity;
 std::vector<Tuple> initial_facts;
 std::vector<Tuple> possible_facts;
 std::vector<std::vector<Tuple>> possible_actions;
@@ -55,36 +54,36 @@ EngineBackend engine_backend;
 bool is_yap_engine_initialized = false;
 bool is_gdlcc_engine_initialized = false;
 
-template <class Iterator>
-std::string TupleToString(const Iterator& begin, const Iterator& end) {
-  assert(std::distance(begin, end) > 0);
-  if (std::distance(begin, end) == 1) {
-    // Atom
-    return std::string(AtomToString(*begin));
-  }
-  // Compound term
-  std::ostringstream o;
-  o << '(';
-  o << AtomToString(*begin) << ' ';
-  for (auto i = begin + 1; i != end; ++i) {
-    const auto atom = *i;
-//    o << AtomToString(atom);
-    if (atom_to_functor_arity.count(atom)) {
-      // Functor atom
-      const auto arity = atom_to_functor_arity[atom];
-      o << TupleToString(i, i + arity);
-      i += arity - 1;
-    } else {
-      // Non-functor atom
-      o << AtomToString(atom);
-    }
-    if (i != end - 1) {
-      o << ' ';
-    }
-  }
-  o << ')';
-  return o.str();
-}
+//template <class Iterator>
+//std::string TupleToString(const Iterator& begin, const Iterator& end) {
+//  assert(std::distance(begin, end) > 0);
+//  if (std::distance(begin, end) == 1) {
+//    // Atom
+//    return std::string(AtomToString(*begin));
+//  }
+//  // Compound term
+//  std::ostringstream o;
+//  o << '(';
+//  o << AtomToString(*begin) << ' ';
+//  for (auto i = begin + 1; i != end; ++i) {
+//    const auto atom = *i;
+////    o << AtomToString(atom);
+//    if (atom_to_functor_arity.count(atom)) {
+//      // Functor atom
+//      const auto arity = atom_to_functor_arity[atom];
+//      o << TupleToString(i, i + arity);
+//      i += arity - 1;
+//    } else {
+//      // Non-functor atom
+//      o << AtomToString(atom);
+//    }
+//    if (i != end - 1) {
+//      o << ' ';
+//    }
+//  }
+//  o << ')';
+//  return o.str();
+//}
 
 const std::string& AtomToString(const Atom atom) {
   return atom_to_string.left.at(atom);
@@ -95,7 +94,21 @@ Atom StringToAtom(const std::string& atom_str) {
 }
 
 std::string TupleToString(const Tuple& tuple) {
-  return TupleToString(tuple.begin(), tuple.end());
+  if (tuple.size() == 1) {
+    return AtomToString(tuple.front());
+  } else {
+    std::ostringstream o;
+    o << '(';
+    for (auto it = tuple.begin(); it != tuple.end(); ++it) {
+      o << AtomToString(*it);
+      if (it != tuple.end() - 1) {
+        o << ' ';
+      }
+    }
+    o << ')';
+    return o.str();
+  }
+//  return TupleToString(tuple.begin(), tuple.end());
 }
 
 Tuple NodeToTuple(const sexpr_parser::TreeNode& node) {

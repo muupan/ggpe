@@ -16,7 +16,6 @@ bin/test
 *.ggp
 *.pl
 !/interface.pl
-*.kif
 !/test/tictactoe.kif
 !/test/breakthrough.kif
 !/sample/breakthrough.kif

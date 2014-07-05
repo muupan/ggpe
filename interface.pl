@@ -1,24 +1,24 @@
 :- use_module(library(lists)).
 :- use_module(library(maplist)).
 
-f_distinct(_x, _y) :- _x \= _y.
+gdl_distinct(_x, _y) :- _x \= _y.
 
-f_or(_x, _y) :- _x; _y.
-f_or(_x, _y, _z) :- _x; _y; _z.
-f_or(_x, _y, _z, _w) :- _x; _y; _z; _w.
-f_or(_x, _y, _z, _w, _v) :- _x; _y; _z; _w; _v.
-f_or(_x, _y, _z, _w, _v, _q) :- _x; _y; _z; _w; _v; _q.
-f_or(_x, _y, _z, _w, _v, _q, _r) :- _x; _y; _z; _w; _v; _q; _r.
-f_or(_x, _y, _z, _w, _v, _q, _r, _s) :- _x; _y; _z; _w; _v; _q; _r; _s.
-f_or(_x, _y, _z, _w, _v, _q, _r, _s, _t) :- _x; _y; _z; _w; _v; _q; _r; _s; _t.
-f_or(_x, _y, _z, _w, _v, _q, _r, _s, _t, _u) :- _x; _y; _z; _w; _v; _q; _r; _s; _t; _u.
+gdl_or(_x, _y) :- _x; _y.
+gdl_or(_x, _y, _z) :- _x; _y; _z.
+gdl_or(_x, _y, _z, _w) :- _x; _y; _z; _w.
+gdl_or(_x, _y, _z, _w, _v) :- _x; _y; _z; _w; _v.
+gdl_or(_x, _y, _z, _w, _v, _q) :- _x; _y; _z; _w; _v; _q.
+gdl_or(_x, _y, _z, _w, _v, _q, _r) :- _x; _y; _z; _w; _v; _q; _r.
+gdl_or(_x, _y, _z, _w, _v, _q, _r, _s) :- _x; _y; _z; _w; _v; _q; _r; _s.
+gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t) :- _x; _y; _z; _w; _v; _q; _r; _s; _t.
+gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t, _u) :- _x; _y; _z; _w; _v; _q; _r; _s; _t; _u.
 
-f_not(_x) :- not(_x).
+gdl_not(_x) :- not(_x).
 
-:- dynamic f_true/1, f_does/2.
+:- dynamic gdl_true/1, gdl_does/2.
 
 assert_true(_fact) :-
-    assertz(f_true(_fact)).
+    assertz(gdl_true(_fact)).
 
 assert_all_true([]).
 assert_all_true([_h | _t]) :-
@@ -26,7 +26,7 @@ assert_all_true([_h | _t]) :-
     assert_all_true(_t).
 
 assert_does(_role, _action) :-
-    assertz(f_does(_role, _action)).
+    assertz(gdl_does(_role, _action)).
 
 assert_all_does([]).
 assert_all_does([[_r, _a] | _t]) :-
@@ -34,10 +34,10 @@ assert_all_does([[_r, _a] | _t]) :-
     assert_all_does(_t).
 
 retractall_true :-
-    retractall(f_true(_)).
+    retractall(gdl_true(_)).
 
 retractall_does :-
-    retractall(f_does(_, _)).
+    retractall(gdl_does(_, _)).
     
 run_with_facts(_facts, _goal) :-
     assert_all_true(_facts),
@@ -52,16 +52,16 @@ run_with_facts_and_actions(_facts, _actions, _goal) :-
 %   ?- state_role(X).
 %   X = [white, black]
 state_role(_roles) :-
-    all(_role, f_role(_role), _roles).
+    all(_role, gdl_role(_role), _roles).
 
 % Usage:
 %   ?- state_init(X).
 %   X = [cell('1','1',b),...,control(white)]
 state_init(_facts) :-
-    all(_fact, f_init(_fact), _facts).
+    all(_fact, gdl_init(_fact), _facts).
     
 state_next_without_assertion(_result) :-
-    all(_fact, f_next(_fact), _facts) -> _result = _facts; _result = [].
+    all(_fact, gdl_next(_fact), _facts) -> _result = _facts; _result = [].
 
 state_next_and_goal_without_assertion(_facts, _role_goal_pairs) :-
     state_next_without_assertion(_facts),
@@ -79,7 +79,7 @@ state_next_and_goal(_oldfacts, _actions, _facts, _role_goal_pairs) :-
     run_with_facts_and_actions(_oldfacts, _actions, state_next_and_goal_without_assertion(_facts, _role_goal_pairs)).
     
 state_legal_without_assertion(_role_actions_pairs) :-
-    all([_role, _actions], setof(_action, f_legal(_role, _action), _actions), _role_actions_pairs).
+    all([_role, _actions], setof(_action, gdl_legal(_role, _action), _actions), _role_actions_pairs).
 
 % Usage:
 %   ?- state_legal([cell('1','1',b),...,control(white)],X).
@@ -88,7 +88,7 @@ state_legal(_facts, _role_actions_pairs) :-
     run_with_facts(_facts, state_legal_without_assertion(_role_actions_pairs)).
 
 state_terminal_without_assertion :-
-    a_terminal.
+    gdl_terminal.
 
 % Usage:
 %   ?- state_terminal([cell('1','1',x),...,control(white)]).
@@ -97,7 +97,7 @@ state_terminal(_facts) :-
     run_with_facts(_facts, state_terminal_without_assertion).
 
 state_goal_without_assertion(_role_goal_pairs) :-
-    all([_role, _goal], f_goal(_role, _goal), _role_goal_pairs).
+    all([_role, _goal], gdl_goal(_role, _goal), _role_goal_pairs).
 
 % Usage:
 %   ?- state_goal([cell('1','1',x),...,control(white)],X).
@@ -171,19 +171,19 @@ state_simulate_with_history(_facts, _role_goal_pairs, _history) :-
 state_base(_facts) :-
     memo_state_base(_facts), !.
 state_base(_facts) :-
-    all(_fact, f_base(_fact), _facts),
+    all(_fact, gdl_base(_fact), _facts),
     assertz(memo_state_base(_facts)).
 
 state_input(_role_actions_pairs) :-
     memo_state_input(_role_actions_pairs), !.
 state_input(_role_actions_pairs) :-
-    all([_role, _actions], setof(_action, f_input(_role, _action), _actions), _role_actions_pairs),
+    all([_role, _actions], setof(_action, gdl_input(_role, _action), _actions), _role_actions_pairs),
     assertz(memo_state_input(_role_actions_pairs)).
 
 state_input_only_actions(_actions) :-
     memo_state_input_only_actions(_actions), !.
 state_input_only_actions(_actions) :-
-    all(_action, f_input(_, _action), _actions),
+    all(_action, gdl_input(_, _action), _actions),
     assertz(memo_state_input_only_actions(_actions)).
     
 unordered_domain(_relation, _list) :-
@@ -212,7 +212,7 @@ ordered_domain_tmp(_relation, [_h | _t], _domain) :-
     _length >= 3.
     
 % Usage:
-%   ?- ordered_domain(f_succ,X).
+%   ?- ordered_domain(gdl_succ,X).
 %   X = [a_1,a_2,a_3,...]
 ordered_domain(_relation, _ordered_domain) :-
     memo_state_ordered_domain(_order_relation_domain_pairs), !,
@@ -231,7 +231,7 @@ nested_call(_outside, _inside, _arg) :-
     call(_goal_outside).
     
 initial_value(_relation, _value) :-
-    nested_call(f_init, _relation, _value).
+    nested_call(gdl_init, _relation, _value).
 
 step_counter(_fact_relation, _order_relation) :-
     initial_value(_fact_relation, _initial_value),
@@ -310,8 +310,8 @@ connected_args_bidir(_rel1, _arg1, _rel2, _arg2) :-
     connected_args(_rel1, _arg1, _rel2, _arg2);
     connected_args(_rel2, _arg2, _rel1, _arg1).
 
-directly_connected_args(f_distinct, 1, f_distinct, 2).
-directly_connected_args(f_distinct, 2, f_distinct, 1).
+directly_connected_args(gdl_distinct, 1, gdl_distinct, 2).
+directly_connected_args(gdl_distinct, 2, gdl_distinct, 1).
 directly_connected_args(_order_rel, 1, _order_rel, 2) :-
     ordered_domain(_order_rel, _).
 directly_connected_args(_order_rel, 2, _order_rel, 1) :-
@@ -435,7 +435,7 @@ atom_lt(_a, _b) :-
 %indirectly_connected_args(_rel1, _arg1, _rel2, _arg2) :-
 %    (atom_lt(_rel2, _rel1); (_rel1 = _rel2, _arg2 < _arg1)),
 %    indirectly_connected_args(_rel2, _arg2, _rel1, _arg1).
-%indirectly_connected_args(f_distinct, 1, f_distinct, 2).
+%indirectly_connected_args(gdl_distinct, 1, gdl_distinct, 2).
 %indirectly_connected_args(_order_rel, 1, _order_rel, 2) :-
 %    ordered_domain(_order_rel, _).
 %indirectly_connected_args(_rel1, _arg1, _rel2, _arg2) :-
@@ -523,10 +523,10 @@ action_relation(_rel) :-
     member(_rel, _rels).
 
 all_fact_relation(_fact_relations) :-
-    all(_fact_relation, (f_base(_fact), fact_and_relation(_fact_relation, _fact)), _fact_relations).
+    all(_fact_relation, (gdl_base(_fact), fact_and_relation(_fact_relation, _fact)), _fact_relations).
     
 all_action_relation(_action_relations) :-
-    all(_action_relation, (f_input(_, _action), action_and_relation(_action_relation, _action)), _action_relations).
+    all(_action_relation, (gdl_input(_, _action), action_and_relation(_action_relation, _action)), _action_relations).
 
 order_relation(_order_rel) :-
     ordered_domain(_order_rel, _).
@@ -592,7 +592,7 @@ extract_actions(_action_rel, _actions, _rel_actions) :-
     all(_rel_action, (member(_rel_action, _actions), action_and_relation(_action_rel, _rel_action)), _rel_actions).
 
 fact_action_pair(_fact, _role, _action, _cor) :-
-    f_input(_role, _action),
+    gdl_input(_role, _action),
     state_next([], [[_role, _action]], [_fact]),
     _fact =.. [_fact_rel | _fact_args],
     _action =.. [_action_rel | _action_args],
@@ -631,8 +631,8 @@ fact_action_rel_pair_actions(_fact_rel, _role, _actions, _cor) :-
     
 fact_action_rel_pair_(_fact_rel, _role, _action_rel, _shared_cor) :-
     user_defined_functor(_action_rel, _),
-    f_role(_role),
-    all(_action, f_input(_role, _action), _actions),
+    gdl_role(_role),
+    all(_action, gdl_input(_role, _action), _actions),
     extract_actions(_action_rel, _actions, _actions_of_rel_all),
     random_sampling(10, _actions_of_rel_all, _actions_of_rel),
     user_defined_functor(_fact_rel, _),
@@ -647,7 +647,7 @@ shared_by_all(_shared, [_list | _list_of_list]) :-
 fact_action_correspond(_fact_rel, _role, _action_rel, _unique_cor) :-
     user_defined_functor(_fact_rel, _),
     user_defined_functor(_action_rel, _),
-    f_role(_role),
+    gdl_role(_role),
     all(_cor, fact_action_rel_pair(_fact_rel, _role, _action_rel, _cor), _cors),
     shared_by_all(_unique_cor, _cors).
     

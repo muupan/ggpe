@@ -32,7 +32,7 @@ using AtomAndYapAtom = UnorderedBimap<Atom, YAP_Atom>::value_type;
 using AtomAndString = UnorderedBimap<Atom, std::string>::value_type;
 
 // Constants
-extern const auto kAtomOffset = 256;
+extern const auto kAtomOffset = 512;
 
 // Global variables
 extern UnorderedBimap<Atom, std::string> atom_to_string;
@@ -40,9 +40,7 @@ extern std::string game_name;
 extern std::vector<Atom> roles;
 extern std::vector<int> role_indices;
 extern std::unordered_map<Atom, int> atom_to_role_index;
-extern std::unordered_map<Atom, int> atom_to_functor_arity;
 extern std::unordered_map<Atom, int> atom_to_goal_values;
-extern std::unordered_map<std::string, int> functor_name_to_arity;
 extern std::vector<Tuple> initial_facts;
 extern std::vector<Tuple> possible_facts;
 extern std::vector<std::vector<Tuple>> possible_actions;
@@ -62,8 +60,7 @@ namespace {
 using Mutex = std::mutex;
 
 // Constants
-const auto kFunctorPrefix = std::string("f_");
-const auto kAtomPrefix = std::string("a_");
+const auto kPrefix = std::string("gdl_");
 
 // Global variables
 Mutex mutex;
@@ -145,14 +142,25 @@ std::string AtomsToString(const std::vector<Atom>& atoms) {
 }
 
 YAP_Atom AtomToYapAtom(const Atom atom) {
+#ifndef NDEBUG
+  if (!atom_to_yap_atom.left.count(atom)) {
+    std::cerr << "Cannot convert atom=" << atom << " to yap atom." << std::endl;
+  }
+#endif
   return atom_to_yap_atom.left.at(atom);
 }
 
 Atom YapAtomToAtom(const YAP_Atom yap_atom) {
+#ifndef NDEBUG
+  if (!atom_to_yap_atom.right.count(yap_atom)) {
+    std::cerr << "Cannot convert yap_atom=" << YAP_AtomName(yap_atom) << " to atom." << std::endl;
+  }
+#endif
   return atom_to_yap_atom.right.at(yap_atom);
 }
 
 YAP_Atom StringToYapAtom(const std::string& atom_str) {
+  assert(atom_to_yap_atom.left.count(StringToAtom(atom_str)));
   return AtomToYapAtom(StringToAtom(atom_str));
 }
 
@@ -208,6 +216,8 @@ Tuple YapCompoundTermToTuple(const YAP_Term& term) {
   const auto functor = YAP_FunctorOfTerm(term);
   const auto arity = YAP_ArityOfFunctor(functor);
   Tuple tuple;
+  // (arity + 1) is not enough in case of compound terms inside compound terms.
+  // Thus, what should be done here is only reserving, not resizing.
   tuple.reserve(arity + 1);
   const auto functor_atom = YapAtomToAtom(YAP_NameOfFunctor(functor));
   tuple.push_back(functor_atom);
@@ -218,9 +228,11 @@ Tuple YapCompoundTermToTuple(const YAP_Term& term) {
       const auto arg_atom = YapTermToAtom(arg);
       tuple.push_back(arg_atom);
     } else {
-      // Compound terms are flattened
+      // Compound terms inside compound terms are flattened between parens
+      tuple.push_back(atoms::kLeftParen);
       const auto arg_tuple = YapCompoundTermToTuple(arg);
       tuple.insert(tuple.end(), arg_tuple.begin(), arg_tuple.end());
+      tuple.push_back(atoms::kRightParen);
     }
   }
   return tuple;
@@ -236,25 +248,51 @@ Tuple YapTermToTuple(const YAP_Term& term) {
 }
 
 template <class Iterator>
-YAP_Term TupleToYapTerm(Iterator& pos) {
-//  static_assert(std::is_same<decltype(*pos), Atom>::value, "");
-  if (!atom_to_functor_arity.count(*pos)) {
-    return AtomToYapTerm(*(pos++));
+YAP_Term CollectYapTerm(Iterator& it) {
+  if (*it == atoms::kLeftParen) {
+    ++it;
+    assert(*it != atoms::kLeftParen);
+    assert(*it != atoms::kRightParen);
+    const auto functor_atom = AtomToYapAtom(*it);
+    std::vector<YAP_Term> args;
+    while (*it != atoms::kRightParen) {
+      args.push_back(CollectYapTerm(it));
+    }
+    assert(*it == atoms::kRightParen);
+    ++it;
+    const auto functor = YAP_MkFunctor(functor_atom, args.size());
+    return YAP_MkApplTerm(functor, args.size(), args.data());
+  } else {
+    assert(*it != atoms::kRightParen);
+    return AtomToYapTerm(*(it++));
   }
-  const auto arity = atom_to_functor_arity[*pos];
-  const auto functor = YAP_MkFunctor(AtomToYapAtom(*pos), arity);
-  ++pos;
-  std::vector<YAP_Term> args(arity);
-  for (auto i = 0; i < arity; ++i) {
-    args[i] = TupleToYapTerm(pos);
-  }
-  return YAP_MkApplTerm(functor, arity, args.data());
 }
 
 YAP_Term TupleToYapTerm(const Tuple& tuple) {
+//  std::cout << "TupleToYapTerm" << std::endl;
+//  std::cout << "size=" << tuple.size() << std::endl;
+//  for (const auto& atom : tuple) {
+//    std::cout << atom << ' ' << AtomToString(atom) << std::endl;
+//  }
+//  std::cout << TupleToString(tuple) << std::endl;
   assert(!tuple.empty());
-  auto i = tuple.begin();
-  return TupleToYapTerm(i);
+  if (tuple.size() == 1) {
+//    std::cout << "size=1 atom=" << tuple.front() << std::endl;
+//    std::cout << "yap_atom=" << YAP_AtomName(AtomToYapAtom(tuple.front())) << std::endl;
+    return AtomToYapTerm(tuple.front());
+  } else {
+//    auto i = tuple.begin();
+//    return TupleToYapTerm(i);
+    const auto functor_atom = AtomToYapAtom(tuple.front());
+    std::vector<YAP_Term> args;
+    auto it = tuple.begin() + 1;
+    while (it != tuple.end()) {
+      args.push_back(CollectYapTerm(it));
+    }
+    const auto functor = YAP_MkFunctor(functor_atom, args.size());
+    return YAP_MkApplTerm(functor, args.size(), args.data());
+//    return TupleToYapTerm(i);
+  }
 }
 
 std::vector<Tuple> YapPairTermToTuples(const YAP_Term pair_term) {
@@ -674,65 +712,21 @@ void DetectActionOrderedArgs() {
  * @param non_functor_atom_strs
  */
 void ConstructAtomDictionary(
-    const std::unordered_map<std::string, int>& functor_atom_strs,
-    const std::unordered_set<std::string>& non_functor_atom_strs) {
+    const std::unordered_set<std::string>& atom_strs) {
   atom_to_string.clear();
   atom_to_yap_atom.clear();
-  std::set<std::string> sorted_atom_strs;
-  for (const auto& pair : functor_atom_strs) {
-    sorted_atom_strs.insert(pair.first);
-  }
-  sorted_atom_strs.insert(
-      non_functor_atom_strs.begin(),
-      non_functor_atom_strs.end());
+  // GDL atoms
+  std::set<std::string> sorted_atom_strs(atom_strs.begin(), atom_strs.end());
   for (const auto& atom_str : sorted_atom_strs) {
     // Assign atom id for each atom string
     const auto atom = atom_to_string.size() + kAtomOffset;
-//    std::cout << atom_str << ": " << atom << std::endl;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
-    if (non_functor_atom_strs.count(atom_str)) {
-      // Non-functor atoms
-      const auto atom_str_with_prefix = kAtomPrefix + atom_str;
-      const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
-      atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
-    } else if (functor_atom_strs.count(atom_str)) {
-      // Functor atoms
-      const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
-      const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
-      atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
-    }
+    const auto atom_str_with_prefix = kPrefix + atom_str;
+    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
+    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
   }
-//  std::vector<std::string> sorted_functor_atom_strs;
-//  sorted_functor_atom_strs.reserve(functor_atom_strs.size());
-//  for (const auto& pair : functor_atom_strs) {
-//    sorted_functor_atom_strs.push_back(pair.first);
-//  }
-//  std::sort(sorted_functor_atom_strs.begin(), sorted_functor_atom_strs.end());
-//  std::vector<std::string> sorted_non_functor_atom_strs(non_functor_atom_strs.begin(), non_functor_atom_strs.end());
-//  std::sort(sorted_non_functor_atom_strs.begin(), sorted_non_functor_atom_strs.end());
-//  atom_to_string.clear();
-//  atom_to_yap_atom.clear();
-//  for (const auto& atom_str : sorted_functor_atom_strs) {
-//    // Assign atom id for each atom string
-//    const auto atom = atom_to_string.size() + kAtomOffset;
-//    atom_to_string.insert(AtomAndString(atom, atom_str));
-//    // Paring atom id and YAP_Atom
-//    const auto atom_str_with_prefix = kFunctorPrefix + atom_str;
-//    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
-//    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
-//  }
-//  for (const auto& atom_str : sorted_non_functor_atom_strs) {
-//    // Assign atom id for each atom string
-//    const auto atom = atom_to_string.size() + kAtomOffset;
-//    atom_to_string.insert(AtomAndString(atom, atom_str));
-//    // Paring atom id and YAP_Atom
-//    const auto atom_str_with_prefix = kAtomPrefix + atom_str;
-//    const auto yap_atom = YAP_LookupAtom(atom_str_with_prefix.c_str());
-//    atom_to_yap_atom.insert(AtomAndYapAtom(atom, yap_atom));
-//  }
-  // Reserved atoms
-  // Free atom: ?
+  // Other atoms
   atom_to_string.insert(AtomAndString(atoms::kFree, "?"));
   // Atoms relative to free atom: ?-255, ?-254, ..., ?+255
   for (auto atom = atoms::kFree - 255; atom <= atoms::kFree + 255; ++atom) {
@@ -742,6 +736,8 @@ void ConstructAtomDictionary(
     const auto str = (boost::format("?%1$+d") % atom).str();
     atom_to_string.insert(AtomAndString(atom, str));
   }
+  atom_to_string.insert(AtomAndString(atoms::kLeftParen, "("));
+  atom_to_string.insert(AtomAndString(atoms::kRightParen, ")"));
 }
 
 //void LoadPrologFile(const std::string& filename) {
@@ -804,8 +800,8 @@ void InitializePrologEngine(
   ofs << sexpr_parser::ToProlog(
       kif_nodes,
       true,
-      kFunctorPrefix,
-      kAtomPrefix,
+      kPrefix,
+      kPrefix,
       true,
       enables_tabling);
   ofs.close();
@@ -823,14 +819,9 @@ void InitializeYapEngine(
   const auto nodes = sexpr_parser::ParseKIF(kif);
   InitializePrologEngine(nodes, enables_tabling);
   // Now YAP Prolog is available
-  const auto functor_atom_strs = sexpr_parser::CollectFunctorAtoms(nodes);
-  const auto non_functor_atom_strs = sexpr_parser::CollectNonFunctorAtoms(nodes);
-  ConstructAtomDictionary(functor_atom_strs, non_functor_atom_strs);
-  atom_to_functor_arity.clear();
-  for (const auto& pair : functor_atom_strs) {
-    atom_to_functor_arity.emplace(StringToAtom(pair.first), pair.second);
-  }
-  CacheGoalValues(non_functor_atom_strs);
+  const auto atom_strs = sexpr_parser::CollectAtoms(nodes);
+  ConstructAtomDictionary(atom_strs);
+  CacheGoalValues(atom_strs);
   CacheConstantYapObjects();
   CacheRoles();
   CacheInitialFacts();

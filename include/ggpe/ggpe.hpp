@@ -15,7 +15,22 @@ namespace ggpe {
 
 namespace atoms {
 
+/**
+ * Unbound argument
+ */
 constexpr auto kFree = 0;
+
+// -255, ..., -1, 1, ..., 255 are used for representing relative positions.
+
+/**
+ * Left parenthesis (used only for compound terms inside compound terms)
+ */
+constexpr auto kLeftParen = 256;
+
+/**
+ * Right parenthesis (used only for compound terms inside compound terms)
+ */
+constexpr auto kRightParen = 257;
 
 }
 
