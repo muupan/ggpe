@@ -30,6 +30,22 @@ const auto breakthrough_filename = "kif/breakthrough.kif";
 const auto pilgrimage_filename = "kif/pilgrimage.kif";
 const auto chinesecheckers4_filename = "kif/chinesecheckers4.kif";
 
+void TestChineseCheckers4() {
+  auto state = CreateInitialState();
+  std::cout << state->ToString() << std::endl;
+  ASSERT_FALSE(state->IsTerminal());
+  ASSERT_EQ(GetRoleCount(), 4);
+  ASSERT_EQ(StringToRoleIndex("yellow"), 0);
+  ASSERT_EQ(StringToRoleIndex("green"), 1);
+  ASSERT_EQ(StringToRoleIndex("blue"), 2);
+  ASSERT_EQ(StringToRoleIndex("magenta"), 3);
+  ASSERT_EQ(state->GetFacts().size(), 20);
+//  ASSERT_EQ(state->GetLegalActions()[0].size(), 3);
+//  ASSERT_EQ(state->GetLegalActions()[1].size(), 10);
+  state->Simulate();
+  SimpleSimulate(CreateInitialState());
+}
+
 }
 
 TEST(GetGameName, TicTacToe) {
@@ -196,20 +212,10 @@ TEST(InitializeFromFile, Pilgrimage) {
 }
 
 TEST(InitializeFromFile, ChineseCheckers4) {
-  InitializeFromFile(chinesecheckers4_filename);
-  auto state = CreateInitialState();
-  std::cout << state->ToString() << std::endl;
-  ASSERT_FALSE(state->IsTerminal());
-  ASSERT_EQ(GetRoleCount(), 4);
-  ASSERT_EQ(StringToRoleIndex("yellow"), 0);
-  ASSERT_EQ(StringToRoleIndex("green"), 1);
-  ASSERT_EQ(StringToRoleIndex("blue"), 2);
-  ASSERT_EQ(StringToRoleIndex("magenta"), 3);
-  ASSERT_EQ(state->GetFacts().size(), 20);
-//  ASSERT_EQ(state->GetLegalActions()[0].size(), 3);
-//  ASSERT_EQ(state->GetLegalActions()[1].size(), 10);
-  state->Simulate();
-  SimpleSimulate(CreateInitialState());
+  InitializeFromFile(chinesecheckers4_filename, EngineBackend::YAP);
+  TestChineseCheckers4();
+  InitializeFromFile(chinesecheckers4_filename, EngineBackend::GDLCC);
+  TestChineseCheckers4();
 }
 
 }
