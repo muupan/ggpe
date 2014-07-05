@@ -13,8 +13,12 @@ namespace {
 void SimpleSimulate(const StateSp& state) {
   auto tmp_state = state;
   while (!tmp_state->IsTerminal()) {
+//    std::cout << "tmp_state:" << std::endl;
+//    std::cout << tmp_state->ToString() << std::endl;
     JointAction joint_action(GetRoleCount());
     for (const auto role_idx : GetRoleIndices()) {
+      ASSERT_EQ(tmp_state->GetLegalActions().size(), GetRoleCount());
+      ASSERT_TRUE(!tmp_state->GetLegalActions().at(role_idx).empty());
       joint_action.at(role_idx) = tmp_state->GetLegalActions().at(role_idx).front();
     }
     tmp_state = tmp_state->GetNextState(joint_action);
@@ -24,6 +28,7 @@ void SimpleSimulate(const StateSp& state) {
 const auto tictactoe_filename = "kif/tictactoe.kif";
 const auto breakthrough_filename = "kif/breakthrough.kif";
 const auto pilgrimage_filename = "kif/pilgrimage.kif";
+const auto chinesecheckers4_filename = "kif/chinesecheckers4.kif";
 
 }
 
@@ -187,7 +192,23 @@ TEST(InitializeFromFile, Pilgrimage) {
   ASSERT_EQ(state->GetLegalActions()[0].size(), 3);
   ASSERT_EQ(state->GetLegalActions()[1].size(), 10);
   state->Simulate();
-  std::cout << "AA" << std::endl;
+  SimpleSimulate(CreateInitialState());
+}
+
+TEST(InitializeFromFile, ChineseCheckers4) {
+  InitializeFromFile(chinesecheckers4_filename);
+  auto state = CreateInitialState();
+  std::cout << state->ToString() << std::endl;
+  ASSERT_FALSE(state->IsTerminal());
+  ASSERT_EQ(GetRoleCount(), 4);
+  ASSERT_EQ(StringToRoleIndex("yellow"), 0);
+  ASSERT_EQ(StringToRoleIndex("green"), 1);
+  ASSERT_EQ(StringToRoleIndex("blue"), 2);
+  ASSERT_EQ(StringToRoleIndex("magenta"), 3);
+  ASSERT_EQ(state->GetFacts().size(), 20);
+//  ASSERT_EQ(state->GetLegalActions()[0].size(), 3);
+//  ASSERT_EQ(state->GetLegalActions()[1].size(), 10);
+  state->Simulate();
   SimpleSimulate(CreateInitialState());
 }
 
