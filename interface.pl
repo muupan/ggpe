@@ -480,6 +480,12 @@ fact_arg_ordered_domain(_fact_rel, _arg, _order_rel) :-
     fact_arg_values(_fact_rel, _arg, _values),
     %print(_fact_rel),write(' arg:'),print(_arg),write(' values:'),print(_values),nl,
     forall(member(_value, _values), member(_value, _domain)).
+
+values_are_in_ordered_domain(_values, _order_rel) :-
+    % ordered_domain(_order_rel, _domain),
+    state_ordered_domain(_order_rel_domain_pairs),
+    member([_order_rel, _domain], _order_rel_domain_pairs),
+    forall(member(_value, _values), member(_value, _domain)).
     
 action_arg_values_triplets(_action_arg_values_triplets) :-
     memo_action_values_triplets(_action_arg_values_triplets), !.
@@ -505,7 +511,7 @@ action_arg_ordered_domain(_action_rel, _arg, _order_rel) :-
     action_arg_values(_action_rel, _arg, _values),
     %print(_action_rel),write(' arg:'),print(_arg),write(' values:'),print(_values),nl,
     forall(member(_value, _values), member(_value, _domain)).
-    
+
 connected_fact_action_args(_fact_rel, _fact_arg, _action_rel, _action_arg, _order_rel) :-
     %write('connected_fact_action_args'),print([_fact_rel, _fact_arg, _action_rel, _action_arg, _order_rel]),nl,
     directly_connected_args_bidir(_fact_rel, _fact_arg, _action_rel, _action_arg),
@@ -515,10 +521,13 @@ connected_fact_action_args(_fact_rel, _fact_arg, _action_rel, _action_arg, _orde
     %    indirectly_connected_args(_action_rel, _action_arg, _order_rel, 1)
     %),
     %writeln('a'),
-    fact_arg_ordered_domain(_fact_rel, _fact_arg, _order_rel),
-    %writeln('a'),
-    action_arg_ordered_domain(_action_rel, _action_arg, _order_rel), !.
-    %writeln('connection found.'), !.
+    fact_arg_values(_fact_rel, _fact_args, _values),
+    action_arg_values(_action_rel, _action_args, _values),
+    values_are_in_ordered_domain(_values, _order_rel).
+    % fact_arg_ordered_domain(_fact_rel, _fact_arg, _order_rel),
+    % %writeln('a'),
+    % action_arg_ordered_domain(_action_rel, _action_arg, _order_rel), !.
+    % %writeln('connection found.'), !.
 
 fact_relations(_fact_rels) :-
     memo_fact_relations(_fact_rels), !.
