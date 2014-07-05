@@ -217,6 +217,86 @@ std::string TreeNode::ToPrologTerm(const bool quotes_atoms, const std::string& f
   }
 }
 
+void TreeNode::CollectVariables(
+    const std::unordered_set<std::string>& ignored,
+    std::unordered_set<std::string>& output) const {
+  if (is_leaf_) {
+    if (IsVariable() && !ignored.count(value_)) {
+      output.insert(value_);
+    }
+  } else {
+    for (const auto& child : children_) {
+      child.CollectVariables(ignored, output);
+    }
+  }
+}
+
+void TreeNode::CollectBoundAndUnboundVariables(
+    std::unordered_set<std::string>& bound_variables,
+    std::unordered_set<std::string>& unbound_variables) const {
+  if (is_leaf_) {
+    return;
+  }
+  const auto& functor = children_.front();
+  assert(functor.IsLeaf());
+  if (functor.GetValue() == "not" || functor.GetValue() == "distinct") {
+    for (auto it = children_.begin() + 1; it != children_.end(); ++it) {
+      if (it->IsVariable() && !bound_variables.count(it->GetValue())) {
+        // Found unbound variable
+        unbound_variables.insert(it->GetValue());
+      } else {
+        it->CollectVariables(bound_variables, unbound_variables);
+      }
+    }
+  } else {
+    for (auto it = children_.begin() + 1; it != children_.end(); ++it) {
+      if (it->IsVariable()) {
+        bound_variables.insert(it->GetValue());
+      } else {
+        it->CollectBoundAndUnboundVariables(bound_variables, unbound_variables);
+      }
+    }
+  }
+}
+
+void TreeNode::ChangeBodyOrderSoThatAllVariablesAreBound() {
+  if (is_leaf_ || !(children_.size() > 0 && children_.front().IsLeaf() && children_.front().GetValue() == "<=")) {
+    // This is not implication
+    return;
+  }
+  assert(children_.size() >= 2);
+  if (children_.size() == 2) {
+    // Head-only implication
+    return;
+  }
+  if (children_.size() == 3) {
+    // Only one body, thus cannot change the order
+    return;
+  }
+//  const auto& head = children_.at(1);
+  auto initial_children = children_;
+  while (true) {
+    std::unordered_set<std::string> unbound_variables;
+    std::unordered_set<std::string> bound_variables;
+    for (auto it = children_.begin() + 2; it != children_.end();) {
+      it->CollectBoundAndUnboundVariables(bound_variables, unbound_variables);
+      if (!unbound_variables.empty() && it != children_.end() - 1) {
+        // If unbound variables are found, move this predicate to the last
+        std::cout << "Unbound variables are found in " << it->ToSexpr() << std::endl;
+        auto moved_to_last = *it;
+        children_.erase(it);
+        children_.push_back(moved_to_last);
+        break;
+      } else {
+        ++it;
+      }
+    }
+    if (unbound_variables.empty() || children_ == initial_children) {
+      break;
+    }
+  }
+}
+
 std::string TreeNode::ToPrologClause(const bool quotes_atoms, const std::string& functor_prefix, const std::string& atom_prefix) const {
   if (is_leaf_) {
     // Fact clause of atom term
@@ -225,6 +305,7 @@ std::string TreeNode::ToPrologClause(const bool quotes_atoms, const std::string&
     assert(!children_.empty() && "Empty clause is not allowed.");
     assert(children_.front().IsLeaf() && "Compound term must start with functor.");
     if (children_.front().GetValue() == "<=") {
+      // Implication clause
       assert(children_.size() >= 2 && "Rule clause must have head.");
       // Rule clause
       std::ostringstream o;
@@ -550,6 +631,18 @@ void TreeNode::CollectNegatedFunctors(
   }
 }
 
+//void TreeNode::CollectVariables(std::unordered_set<std::string>& output) const {
+//  if (is_leaf_) {
+//    if (IsVariable()) {
+//      output.insert(value_);
+//    }
+//  } else {
+//    for (const auto& child : children_) {
+//      child.CollectVariables(output);
+//    }
+//  }
+//}
+
 std::string RemoveComments(const std::string& sexpr) {
   boost::regex comment(";.*?$");
   return boost::regex_replace(sexpr, comment, std::string());
@@ -569,7 +662,7 @@ TreeNode ParseTillRightParen(Tokenizer::iterator& i, const bool flatten_tuple_wi
     }
   }
   if (flatten_tuple_with_one_child && children.size() == 1) {
-    return TreeNode(children.front());
+    return children.front();
   }
   // When this function returns, the iterator is always pointing to ")"
   return TreeNode(children);
@@ -588,6 +681,9 @@ std::vector<TreeNode> Parse(const std::string& sexpr, bool flatten_tuple_with_on
     } else {
       results.push_back(TreeNode(*i));
     }
+  }
+  for (auto& node : results) {
+    node.ChangeBodyOrderSoThatAllVariablesAreBound();
   }
   return results;
 }

@@ -8,6 +8,8 @@ namespace sexpr_parser {
 
 namespace {
 
+using StringSet = std::unordered_set<std::string>;
+
 const auto kTicTacToeKIF = file_utils::LoadStringFromFile("kif/tictactoe.kif");
 const auto kBreakthroughKIF =
     file_utils::LoadStringFromFile("kif/breakthrough.kif");
@@ -228,6 +230,65 @@ TEST(CollectStaticRelations, TicTacToe) {
 //      {"mark", 2},
   };
   ASSERT_EQ(static_relations, answer);
+}
+
+TEST(TreeNode, CollectVariables) {
+  {
+    const auto node = Parse("?x").front();
+    StringSet ignored;
+    StringSet output;
+    node.CollectVariables(ignored, output);
+    ASSERT_EQ(output, StringSet{{"?x"}});
+  }
+  {
+    const auto node = Parse("(a ?x ?y)").front();
+    StringSet ignored{{"?y"}};
+    StringSet output;
+    node.CollectVariables(ignored, output);
+    ASSERT_EQ(output, StringSet{{"?x"}});
+  }
+}
+
+TEST(TreeNode, CollectBoundAndUnboundVariables) {
+  {
+    const auto node = Parse("(a ?x ?y)").front();
+    StringSet bound;
+    StringSet unbound;
+    node.CollectBoundAndUnboundVariables(bound, unbound);
+    ASSERT_EQ(bound, (StringSet({"?x", "?y"})));
+    ASSERT_EQ(unbound, StringSet{});
+  }
+  {
+    const auto node = Parse("(not (a ?x ?y))").front();
+    StringSet bound;
+    StringSet unbound;
+    node.CollectBoundAndUnboundVariables(bound, unbound);
+    ASSERT_EQ(bound, StringSet{});
+    ASSERT_EQ(unbound, (StringSet{"?x", "?y"}));
+  }
+  {
+    const auto node = Parse("(or (not (a ?x)) (a ?y))").front();
+    StringSet bound;
+    StringSet unbound;
+    node.CollectBoundAndUnboundVariables(bound, unbound);
+    ASSERT_EQ(bound, StringSet{"?y"});
+    ASSERT_EQ(unbound, StringSet{"?x"});
+  }
+  {
+    const auto node = Parse("(distinct ?x ?y)").front();
+    StringSet bound;
+    StringSet unbound;
+    node.CollectBoundAndUnboundVariables(bound, unbound);
+    ASSERT_EQ(bound, StringSet{});
+    ASSERT_EQ(unbound, (StringSet{"?x", "?y"}));
+  }
+  {
+    const auto node = Parse("(distinct ?x ?y)").front();
+    StringSet ignored{"?y"};
+    StringSet output;
+    node.CollectVariables(ignored, output);
+    ASSERT_EQ(output, StringSet{"?x"});
+  }
 }
 
 }
