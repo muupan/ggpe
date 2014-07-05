@@ -720,6 +720,7 @@ void ConstructAtomDictionary(
   for (const auto& atom_str : sorted_atom_strs) {
     // Assign atom id for each atom string
     const auto atom = atom_to_string.size() + kAtomOffset;
+    std::cout << atom_str << " -> " << atom << std::endl;
     atom_to_string.insert(AtomAndString(atom, atom_str));
     // Paring atom id and YAP_Atom
     const auto atom_str_with_prefix = kPrefix + atom_str;
