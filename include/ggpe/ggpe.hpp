@@ -186,6 +186,8 @@ StateSp CreateInitialState();
  */
 std::string GetGGPEPath();
 
+EngineBackend GetEngineBackend();
+
 }
 
 #include "state.hpp"

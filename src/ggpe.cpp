@@ -24,6 +24,7 @@
 #include "file_utils.hpp"
 #include "yap_engine.hpp"
 #include "gdlcc_engine.hpp"
+#include "prettyprint.hpp"
 
 namespace ggpe {
 
@@ -137,6 +138,68 @@ Tuple StringToTuple(const std::string& str) {
   return NodeToTuple(node);
 }
 
+bool IsGDLCCEngineValid() {
+  assert(is_yap_engine_initialized);
+  auto yap_state = yap::CreateInitialState();
+  auto gdlcc_state = gdlcc::CreateInitialState();
+  while (!yap_state->IsTerminal()) {
+    if (gdlcc_state->IsTerminal()) {
+      std::cout << "YapState is not terminal, but CppState is terminal." << std::endl;
+      return false;
+    }
+    auto yap_facts = yap_state->GetFacts();
+    auto gdlcc_facts = gdlcc_state->GetFacts();
+    if (yap_facts.size() != gdlcc_facts.size()) {
+      std::cout << "The number of facts in a state differs for YapState and CppState." << std::endl;
+      return false;
+    }
+    std::sort(yap_facts.begin(), yap_facts.end());
+    std::sort(gdlcc_facts.begin(), gdlcc_facts.end());
+    if (yap_facts != gdlcc_facts) {
+      std::cout << "The facts in a state differ for YapState and CppState." << std::endl;
+      std::cout << "yap_facts" << yap_facts << std::endl;
+      std::cout << "gdlcc_facts" << gdlcc_facts << std::endl;
+      std::cout << "YapState:" << std::endl;
+      std::cout << yap_state->ToString();
+      std::cout << "CppState:" << std::endl;
+      std::cout << gdlcc_state->ToString();
+      return false;
+    }
+    if (yap_state->GetLegalActions().size() != gdlcc_state->GetLegalActions().size()) {
+      std::cout << "The number of legal actions in a state differs for YapState and CppState." << std::endl;
+      return false;
+    }
+    JointAction joint_action;
+    for (auto role_idx : GetRoleIndices()) {
+      auto yap_actions = yap_state->GetLegalActions()[role_idx];
+      auto gdlcc_actions = gdlcc_state->GetLegalActions()[role_idx];
+      if (yap_actions.size() != gdlcc_actions.size()) {
+        std::cout << "The number of legal actions for " << role_idx << " in a state differs for YapState and CppState." << std::endl;
+        return false;
+      }
+      std::sort(yap_actions.begin(), yap_actions.end());
+      std::sort(gdlcc_actions.begin(), gdlcc_actions.end());
+      if (yap_actions != gdlcc_actions) {
+        std::cout << "The legal actions for " << role_idx << " in a state differ for YapState and CppState." << std::endl;
+        return false;
+      }
+      joint_action.push_back(yap_actions.front());
+    }
+    yap_state = yap_state->GetNextState(joint_action);
+    gdlcc_state = gdlcc_state->GetNextState(joint_action);
+  }
+  if (!yap_state->IsTerminal()) {
+    std::cout << "YapState is terminal, but CppState is not terminal." << std::endl;
+    return false;
+  }
+  if (yap_state->GetGoals() != gdlcc_state->GetGoals()) {
+    std::cout << "The goal value in a state differs for YapState and CppState." << std::endl;
+    return false;
+  }
+  std::cout << "GDLCC engine is valid." << std::endl;
+  return true;
+}
+
 void Initialize(
     const std::string& kif,
     const std::string& name,
@@ -169,7 +232,8 @@ void Initialize(
 
   // Initialize gdlcc engine
   if (backend == EngineBackend::GDLCC) {
-    if (gdlcc::InitializeGDLCCEngineOrFalse(kif, name, true)) {
+    if (gdlcc::InitializeGDLCCEngineOrFalse(kif, name, true) &&
+        IsGDLCCEngineValid()) {
       std::cout << "Initialized gdlcc engine." << std::endl;
       is_gdlcc_engine_initialized = true;
     } else {
@@ -426,6 +490,14 @@ std::string GetGGPEPath() {
 #else
   static_assert(false, "GGPE_PATH macro must be defined at compile time.");
 #endif
+}
+
+EngineBackend GetEngineBackend() {
+  if (is_gdlcc_engine_initialized) {
+    return EngineBackend::GDLCC;
+  } else {
+    return EngineBackend::YAP;
+  }
 }
 
 }
