@@ -259,21 +259,12 @@ void TreeNode::CollectBoundAndUnboundVariables(
   }
 }
 
-void TreeNode::ChangeBodyOrderSoThatAllVariablesAreBound() {
-  if (is_leaf_ || !(children_.size() > 0 && children_.front().IsLeaf() && children_.front().GetValue() == "<=")) {
-    // This is not implication
-    return;
-  }
+bool TreeNode::ChangeBodyOrderSoThatAllVariablesAreBound() {
+  assert(IsImplication());
   assert(children_.size() >= 2);
-  if (children_.size() == 2) {
-    // Head-only implication
-    return;
-  }
-  if (children_.size() == 3) {
-    // Only one body, thus cannot change the order
-    return;
-  }
-//  const auto& head = children_.at(1);
+  const auto& head = children_.at(1);
+  std::unordered_set<std::string> head_variables;
+  head.CollectVariables(std::unordered_set<std::string>{}, head_variables);
   auto initial_children = children_;
   while (true) {
     std::unordered_set<std::string> unbound_variables;
@@ -291,8 +282,28 @@ void TreeNode::ChangeBodyOrderSoThatAllVariablesAreBound() {
         ++it;
       }
     }
-    if (unbound_variables.empty() || children_ == initial_children) {
-      break;
+    if (unbound_variables.empty()) {
+      const auto are_head_variables_bound =
+          std::all_of(
+              head_variables.begin(),
+              head_variables.end(),
+              [&](const std::string& var) {
+                return bound_variables.count(var);
+              });
+      if (are_head_variables_bound) {
+        // All the variables in the head are bound by body predicates, thus
+        // implication is solvable.
+        return true;
+      } else {
+        // There are head variables not bound by body predicates, thus this
+        // implication is unsolvable.
+        return false;
+      }
+    }
+    if (children_ == initial_children) {
+      // Unbound variables cannot be removed no matter how body predicates are
+      // rearranged, thus this implication is unsolvable
+      return false;
     }
   }
 }
@@ -631,6 +642,14 @@ void TreeNode::CollectNegatedFunctors(
   }
 }
 
+bool TreeNode::IsImplication() const {
+  return
+      !is_leaf_ &&
+      children_.size() >= 2 &&
+      children_.front().IsLeaf() &&
+      children_.front().GetValue() == "<=";
+}
+
 //void TreeNode::CollectVariables(std::unordered_set<std::string>& output) const {
 //  if (is_leaf_) {
 //    if (IsVariable()) {
@@ -682,9 +701,6 @@ std::vector<TreeNode> Parse(const std::string& sexpr, bool flatten_tuple_with_on
       results.push_back(TreeNode(*i));
     }
   }
-  for (auto& node : results) {
-    node.ChangeBodyOrderSoThatAllVariablesAreBound();
-  }
   return results;
 }
 
@@ -727,10 +743,15 @@ std::string GenerateUserDefinedFunctorClauses(
 std::string GenerateTableClauses(
     const std::vector<TreeNode>& nodes,
     const bool quotes_atoms,
-    const std::string& functor_prefix) {
+    const std::string& functor_prefix,
+    const std::unordered_set<std::string>& unsolvable_relations) {
   std::ostringstream o;
   const auto static_relations = CollectStaticRelations(nodes);
   for (const auto& functor_arity_pair : static_relations) {
+    if (unsolvable_relations.count(functor_arity_pair.first)) {
+      // Unsolvable relations cannot be tabled
+      continue;
+    }
     const auto functor_atom =
         ConvertToPrologFunctor(
             functor_arity_pair.first,
@@ -808,14 +829,23 @@ std::string ToProlog(
     const bool adds_helper_clauses,
     const bool enables_tabling) {
   std::ostringstream o;
-  if (enables_tabling) {
-    o << GenerateTableClauses(nodes, quotes_atoms, functor_prefix);
+  auto tmp_nodes = nodes; // copy
+  std::unordered_set<std::string> unsolvable_relations;
+  for (auto& node : tmp_nodes) {
+    if (node.IsImplication() &&
+        !node.ChangeBodyOrderSoThatAllVariablesAreBound()) {
+      unsolvable_relations.insert(node.GetChildren().at(1).GetValue());
+      std::cout << "Unsolvable relation: " << node.GetChildren().at(1).GetValue() << std::endl;
+    }
   }
-  for (const auto& node : nodes) {
+  if (enables_tabling) {
+    o << GenerateTableClauses(tmp_nodes, quotes_atoms, functor_prefix, unsolvable_relations);
+  }
+  for (const auto& node : tmp_nodes) {
     o << node.ToPrologClause(quotes_atoms, functor_prefix, atom_prefix) << std::endl;
   }
   if (adds_helper_clauses) {
-    o << GeneratePrologHelperClauses(nodes, quotes_atoms, functor_prefix, atom_prefix) << std::endl;
+    o << GeneratePrologHelperClauses(tmp_nodes, quotes_atoms, functor_prefix, atom_prefix) << std::endl;
   }
   return o.str();
 }
@@ -913,26 +943,13 @@ std::unordered_map<std::string, int> CollectStaticRelations(
 //      if (functor.first == "index" || functor.first == "cellHolds" || functor.first == "control" || functor.first == "move") {
 //        continue;
 //      }
-//      auto allowed = std::unordered_set<std::string>{{
-////        "countplus",
-////        "horizontal",
-////        "diagonalup",
-////        "scoremap",
-////        "pp",
-////        "diagonaldown",
-////        "kingmove",
-////        "distinctcell",
-////        "cell",
-////        "knightmove",
-////        "owns",
-////        "vertical",
-////        "file",
-////        "rank",
-//        "type"
-//      }};
-//      if (!allowed.count(rel)) {
-//        continue;
-//      }
+      auto allowed = std::unordered_set<std::string>{{
+//        "slow_move_down"
+//        "index"
+      }};
+      if (!allowed.count(rel)) {
+        continue;
+      }
       global_relations.emplace(rel, functors.at(rel));
     }
   }

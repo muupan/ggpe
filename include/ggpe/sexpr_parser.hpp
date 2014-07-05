@@ -138,7 +138,8 @@ public:
 //        const std::unordered_set<std::string>& bound_vairables,
 //        std::unordered_set<std::string>& output) const;
 
-   void ChangeBodyOrderSoThatAllVariablesAreBound();
+   bool ChangeBodyOrderSoThatAllVariablesAreBound();
+   bool IsImplication() const;
 
   /**
    * Collect functor atoms and their argument numbers from this node and its
