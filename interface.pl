@@ -521,8 +521,8 @@ connected_fact_action_args(_fact_rel, _fact_arg, _action_rel, _action_arg, _orde
     %    indirectly_connected_args(_action_rel, _action_arg, _order_rel, 1)
     %),
     %writeln('a'),
-    fact_arg_values(_fact_rel, _fact_args, _values),
-    action_arg_values(_action_rel, _action_args, _values),
+    fact_arg_values(_fact_rel, _fact_arg, _values),
+    action_arg_values(_action_rel, _action_arg, _values),
     values_are_in_ordered_domain(_values, _order_rel).
     % fact_arg_ordered_domain(_fact_rel, _fact_arg, _order_rel),
     % %writeln('a'),
