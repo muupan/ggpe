@@ -4,7 +4,8 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
-
+#include <thread>
+#include <boost/timer/timer.hpp>
 
 namespace ggpe {
 
@@ -22,6 +23,19 @@ void SimpleSimulate(const StateSp& state) {
       joint_action.at(role_idx) = tmp_state->GetLegalActions().at(role_idx).front();
     }
     tmp_state = tmp_state->GetNextState(joint_action);
+  }
+}
+
+void CheckParallelizability(const int total_sim) {
+  auto state = CreateInitialState();
+  for (auto n = 1; n <= 4; ++n) {
+    std::cout << "num_threads(" << n << "):" << std::endl;
+    boost::timer::cpu_timer timer;
+#pragma omp parallel for num_threads(n) schedule(dynamic)
+    for (auto i = 0; i < total_sim; ++i) {
+      SimpleSimulate(state);
+    }
+    std::cout << timer.format() << std::endl;
   }
 }
 
@@ -217,5 +231,33 @@ TEST(InitializeFromFile, ChineseCheckers4) {
   InitializeFromFile(chinesecheckers4_filename, EngineBackend::GDLCC);
   TestChineseCheckers4();
 }
+
+TEST(CheckParallelizability, Breakthrough) {
+  InitializeFromFile(breakthrough_filename, EngineBackend::YAP);
+  CheckParallelizability(100);
+  InitializeFromFile(breakthrough_filename, EngineBackend::GDLCC);
+  CheckParallelizability(1000);
+}
+
+TEST(CheckParallelizability, ChineseCheckers4) {
+  InitializeFromFile(chinesecheckers4_filename, EngineBackend::YAP);
+  CheckParallelizability(100);
+  InitializeFromFile(chinesecheckers4_filename, EngineBackend::GDLCC);
+  CheckParallelizability(1000);
+}
+
+//TEST(ParallelSimulation, YAP) {
+//  InitializeFromFile(breakthrough_filename, EngineBackend::YAP);
+//  auto state = CreateInitialState();
+//  for (auto n = 1; n <= 4; ++n) {
+//    std::cout << "num_threads(" << n << "):" << std::endl;
+//    boost::timer::cpu_timer timer;
+//#pragma omp parallel for num_threads(n)
+//    for (auto i = 0; i < 10; ++i) {
+//      SimpleSimulate(state);
+//    }
+//    std::cout << timer.format() << std::endl;
+//  }
+//}
 
 }

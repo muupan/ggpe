@@ -2,8 +2,8 @@
 GGPE_PATH := $(shell pwd)
 CXXFLAGS += -Wall -std=c++11 -I./include/ggpe -I./src -I. -D'GGPE_PATH="$(GGPE_PATH)"'
 LIBS := -lYap -lreadline -ldl -lgmp -pthread -lmysqlclient -lglog
-LIBS_OSX := -lodbc -lboost_regex-mt -lboost_system-mt -lboost_filesystem-mt
-LIBS_LINUX := -lboost_regex -lboost_system -lboost_filesystem
+LIBS_OSX := -lodbc -lboost_regex-mt -lboost_system-mt -lboost_filesystem-mt -lboost_timer-mt
+LIBS_LINUX := -lboost_regex -lboost_system -lboost_filesystem -lboost_timer
 OS := $(shell uname)
 ifeq ($(OS), Darwin)
 	LIBS += $(LIBS_OSX)
@@ -22,7 +22,7 @@ OBJS := $(shell echo $(SRCS) | perl -p -e 's/\.(cpp|cc)/\.o/g')
 TARGET := lib/libggpe.a
 
 # Macros for test
-CXXFLAGS_TEST := $(CXXFLAGS_DEBUG) -I./test -DGTEST_USE_OWN_TR1_TUPLE
+CXXFLAGS_TEST := $(CXXFLAGS_DEBUG) -I./test -DGTEST_USE_OWN_TR1_TUPLE -fopenmp
 SRCS_TEST := gtest/gtest_main.cc gtest/gtest-all.cc $(filter-out src/main.cpp, $(CXX_FILES))
 OBJS_TEST := $(shell echo $(SRCS_TEST) | perl -p -e 's/\.(cpp|cc)/\.o/g')
 TARGET_TEST := bin/test
