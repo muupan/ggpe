@@ -32,7 +32,7 @@ using AtomAndYapAtom = UnorderedBimap<Atom, YAP_Atom>::value_type;
 using AtomAndString = UnorderedBimap<Atom, std::string>::value_type;
 
 // Constants
-extern const auto kAtomOffset = 512;
+const auto kAtomOffset = 512;
 
 // Global variables
 extern UnorderedBimap<Atom, std::string> atom_to_string;

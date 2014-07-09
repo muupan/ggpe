@@ -28,9 +28,6 @@
 
 namespace ggpe {
 
-// Constants
-const auto kAtomOffset = 256;
-
 template <class K, class V>
 using UnorderedBimap = boost::bimaps::bimap<boost::bimaps::unordered_set_of<K>, boost::bimaps::unordered_set_of<V>>;
 using AtomAndString = UnorderedBimap<Atom, std::string>::value_type;
