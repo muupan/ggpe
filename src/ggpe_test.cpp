@@ -26,6 +26,7 @@ void SimpleSimulate(const StateSp& state) {
   }
 }
 
+#ifndef __clang__
 void CheckParallelizability(const int total_sim) {
   auto state = CreateInitialState();
   for (auto n = 1; n <= 4; ++n) {
@@ -38,6 +39,7 @@ void CheckParallelizability(const int total_sim) {
     std::cout << timer.format() << std::endl;
   }
 }
+#endif
 
 const auto tictactoe_filename = "kif/tictactoe.kif";
 const auto breakthrough_filename = "kif/breakthrough.kif";
@@ -232,6 +234,7 @@ TEST(InitializeFromFile, ChineseCheckers4) {
   TestChineseCheckers4();
 }
 
+#ifndef __clang__
 TEST(CheckParallelizability, Breakthrough) {
   InitializeFromFile(breakthrough_filename, EngineBackend::YAP);
   CheckParallelizability(100);
@@ -245,6 +248,7 @@ TEST(CheckParallelizability, ChineseCheckers4) {
   InitializeFromFile(chinesecheckers4_filename, EngineBackend::GDLCC);
   CheckParallelizability(1000);
 }
+#endif
 
 //TEST(ParallelSimulation, YAP) {
 //  InitializeFromFile(breakthrough_filename, EngineBackend::YAP);

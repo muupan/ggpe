@@ -107,7 +107,10 @@ public:
    * @param atom_prefix
    * @return
    */
-  std::string ToPrologTerm(const bool quotes_atoms, const std::string& functor_prefix, const std::string& atom_prefix) const;
+  std::string ToPrologTerm(
+      const bool quotes_atoms,
+      const std::string& functor_prefix,
+      const std::string& atom_prefix) const;
 
   /**
    * Collect all atoms from this node and its children.
@@ -155,6 +158,18 @@ public:
   TreeNode ReplaceAtoms(const std::string& before, const std::string& after) const;
   bool CollectDynamicRelations(std::unordered_set<std::string>& local_relation_functors) const;
   const std::string& GetFunctor() const;
+  std::string ToPrologRequirementTerm(
+      const bool quotes_atoms,
+      const std::string& functor_prefix,
+      const std::string& atom_prefix,
+      const std::unordered_set<std::string>& dynamic_relations,
+      const bool negated) const;
+  std::string ToPrologRequirementClause(
+      const bool quotes_atoms,
+      const std::string& functor_prefix,
+      const std::string& atom_prefix,
+      const std::unordered_set<std::string>& dynamic_relations) const;
+  bool ContainsAnyAtomOf(const std::unordered_set<std::string>& atoms) const;
 
   /**
    * Check if this node contains given functors.

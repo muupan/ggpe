@@ -13,6 +13,8 @@ gdl_or(_x, _y, _z, _w, _v, _q, _r, _s) :- _x; _y; _z; _w; _v; _q; _r; _s.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t) :- _x; _y; _z; _w; _v; _q; _r; _s; _t.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t, _u) :- _x; _y; _z; _w; _v; _q; _r; _s; _t; _u.
 
+member_and_cut(Item, List) :- member(Item, List), !.
+
 gdl_not(_x) :- not(_x).
 
 :- dynamic gdl_true/1, gdl_does/2.

@@ -6,4 +6,4 @@ if [ "`uname`" = "Linux" ]; then
 else
   BOOST_SUFFIX=-mt
 fi
-$CXX sample.cpp -g -std=c++11 -I../include -L../lib -lggpe -lboost_system$BOOST_SUFFIX -lboost_timer$BOOST_SUFFIX -lboost_filesystem$BOOST_SUFFIX -lboost_regex$BOOST_SUFFIX -lYap -lreadline -lglog -ldl
+$CXX sample.cpp -g -std=c++11 -I../include -L../lib -lggpe -lboost_system$BOOST_SUFFIX -lboost_timer$BOOST_SUFFIX -lboost_filesystem$BOOST_SUFFIX -lboost_regex$BOOST_SUFFIX -lgmp -lYap -lreadline -lglog -ldl

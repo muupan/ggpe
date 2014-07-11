@@ -217,6 +217,90 @@ std::string TreeNode::ToPrologTerm(const bool quotes_atoms, const std::string& f
   }
 }
 
+bool TreeNode::ContainsAnyAtomOf(const std::unordered_set<std::string>& atoms) const {
+  if (is_leaf_) {
+    return atoms.count(value_);
+  } else {
+    return std::any_of(children_.begin(), children_.end(), [&](const TreeNode& child){
+      return child.ContainsAnyAtomOf(atoms);
+    });
+  }
+}
+
+std::string TreeNode::ToPrologRequirementTerm(
+    const bool quotes_atoms,
+    const std::string& functor_prefix,
+    const std::string& atom_prefix,
+    const std::unordered_set<std::string>& dynamic_relations,
+    const bool negated) const {
+  if (GetFunctor() == "true") {
+    assert(children_.size() == 2);
+    if (negated) {
+      return "true";
+    } else {
+      return "member_and_cut(" +
+          children_.at(1).ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix) +
+          ", Fact)";
+    }
+  } else if (GetFunctor() == "does") {
+    assert(children_.size() == 3);
+    if (negated) {
+      return "true";
+    } else {
+      return "member_and_cut([" +
+          children_.at(1).ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix) +
+          ", " +
+          children_.at(2).ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix) +
+          "], Action)";
+    }
+  } else if (GetFunctor() == "not") {
+    assert(children_.size() == 2);
+    if (children_.at(1).ContainsAnyAtomOf(dynamic_relations)) {
+      return "true";
+    } else {
+      return functor_prefix +
+          "not(" +
+          children_.at(1).ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix) +
+          ")";
+    }
+  } else if (GetFunctor() == "or") {
+    std::ostringstream o;
+    o << functor_prefix << "or(";
+    for (auto it = children_.begin() + 1; it != children_.end(); ++it) {
+      o << it->ToPrologRequirementTerm(quotes_atoms, functor_prefix, atom_prefix, dynamic_relations, negated);
+      if (it != children_.end()) {
+        o << ",";
+      }
+    }
+    o << ")";
+    return o.str();
+  } else if (dynamic_relations.count(GetFunctor())) {
+    if (negated) {
+      return "true";
+    } else if (is_leaf_) {
+      return "'requirements_" + ToPrologFunctor(false, functor_prefix) + "'(Fact, Action)";
+    } else {
+      // Compound term
+      assert(children_.size() >= 2  && "Compound term must have a functor and one or more arguments.");
+      assert(children_.front().IsLeaf() && "Compound term must start with functor.");
+      std::ostringstream o;
+      // Functor
+      o << "'requirements_" << children_.front().ToPrologFunctor(false, functor_prefix);
+      o << "'(";
+      // Arguments
+      for (auto i = children_.begin() + 1; i != children_.end(); ++i) {
+        o << i->ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix);
+        o << ", ";
+      }
+      o << "Fact, Action";
+      o << ')';
+      return o.str();
+    }
+  } else {
+    return ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix);
+  }
+}
+
 void TreeNode::CollectVariables(
     const std::unordered_set<std::string>& ignored,
     std::unordered_set<std::string>& output) const {
@@ -650,6 +734,34 @@ bool TreeNode::IsImplication() const {
       children_.front().GetValue() == "<=";
 }
 
+std::string TreeNode::ToPrologRequirementClause(
+    const bool quotes_atoms,
+    const std::string& functor_prefix,
+    const std::string& atom_prefix,
+    const std::unordered_set<std::string>& dynamic_relations) const {
+  const auto functor = "'requirements_" + GetFunctor() + "'";
+  if (IsImplication()) {
+    // Implication clause
+    std::ostringstream o;
+    // Head
+    o << children_.at(1).ToPrologRequirementTerm(quotes_atoms, functor_prefix, atom_prefix, dynamic_relations, false);
+    if (children_.size() >= 3) {
+      // Body
+      o << " :- ";
+      for (auto i = children_.begin() + 2; i != children_.end(); ++i) {
+        if (i != children_.begin() + 2) {
+          o << ", ";
+        }
+        o << i->ToPrologRequirementTerm(quotes_atoms, functor_prefix, atom_prefix, dynamic_relations, false);
+      }
+    }
+    o << '.';
+    return o.str();
+  } else {
+    return ToPrologRequirementTerm(quotes_atoms, functor_prefix, atom_prefix, dynamic_relations, false) + '.';
+  }
+}
+
 //void TreeNode::CollectVariables(std::unordered_set<std::string>& output) const {
 //  if (is_leaf_) {
 //    if (IsVariable()) {
@@ -764,6 +876,35 @@ std::string GenerateTableClauses(
   return o.str();
 }
 
+std::string GenerateRequirementClauses(
+    const std::vector<TreeNode>& nodes,
+    const bool quotes_atoms,
+    const std::string& functor_prefix,
+    const std::string& atom_prefix) {
+  const auto dynamic_relations = CollectDynamicRelations(nodes);
+  std::ostringstream o;
+  for (const auto& node : nodes) {
+    if (node.IsImplication()) {
+      if (dynamic_relations.count(node.GetChildren().at(1).GetFunctor())) {
+        o << node.ToPrologRequirementClause(
+            quotes_atoms,
+            functor_prefix,
+            atom_prefix,
+            dynamic_relations) << std::endl;
+      }
+    } else {
+      if (dynamic_relations.count(node.GetFunctor())) {
+        o << node.ToPrologRequirementClause(
+            quotes_atoms,
+            functor_prefix,
+            atom_prefix,
+            dynamic_relations) << std::endl;
+      }
+    }
+  }
+  return o.str();
+}
+
 std::string GeneratePrologHelperClauses(
     const std::vector<TreeNode>& nodes,
     const bool quotes_atoms,
@@ -818,6 +959,8 @@ std::string GeneratePrologHelperClauses(
     }
     o << "non_ground(" << atom << ")." << std::endl;
   }
+  // Requirement clauses
+  o << GenerateRequirementClauses(nodes, quotes_atoms, functor_prefix, atom_prefix);
   return o.str();
 }
 
