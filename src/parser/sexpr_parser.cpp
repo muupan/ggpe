@@ -238,7 +238,7 @@ std::string TreeNode::ToPrologRequirementTerm(
     if (negated) {
       return "true";
     } else {
-      return "member_and_cut(" +
+      return "required_fact(" +
           children_.at(1).ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix) +
           ", Fact)";
     }
@@ -247,7 +247,7 @@ std::string TreeNode::ToPrologRequirementTerm(
     if (negated) {
       return "true";
     } else {
-      return "member_and_cut([" +
+      return "required_action([" +
           children_.at(1).ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix) +
           ", " +
           children_.at(2).ToPrologTerm(quotes_atoms, functor_prefix, atom_prefix) +
@@ -268,7 +268,7 @@ std::string TreeNode::ToPrologRequirementTerm(
     o << functor_prefix << "or(";
     for (auto it = children_.begin() + 1; it != children_.end(); ++it) {
       o << it->ToPrologRequirementTerm(quotes_atoms, functor_prefix, atom_prefix, dynamic_relations, negated);
-      if (it != children_.end()) {
+      if (it != children_.end() - 1) {
         o << ",";
       }
     }

@@ -13,7 +13,8 @@ gdl_or(_x, _y, _z, _w, _v, _q, _r, _s) :- _x; _y; _z; _w; _v; _q; _r; _s.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t) :- _x; _y; _z; _w; _v; _q; _r; _s; _t.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t, _u) :- _x; _y; _z; _w; _v; _q; _r; _s; _t; _u.
 
-member_and_cut(Item, List) :- member(Item, List), !.
+required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !, gdl_base(Fact).
+required_action([Role, Action], RequiredActions) :- member([Role, Action], RequiredActions), !, gdl_input(Role, Action).
 
 gdl_not(_x) :- not(_x).
 
@@ -724,4 +725,16 @@ fact_action_correspond_(_facts, _changes_list) :-
     state_legal(_facts, _role_actions_pairs),
     joint_actions(_role_actions_pairs, _joint_actions),
     maplist(state_changes(_facts), _joint_actions, _changes_list).
+
+exclude_vars(_list_with_vars, _list_without_vars) :-
+    length(_list_with_vars, 10), include(nonvar, _list_with_vars, _list_without_vars).
     
+win_conditions(_role, _win_conditions) :-
+    gdl_role(_role),
+    all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition)), _win_conditions).
+
+state_win_conditions(_state_win_conditions) :-
+    all([_role, _win_conditions], win_conditions(_role, _win_conditions), _state_win_conditions).
+
+next_conditions(_next_fact, _conditions) :-
+    all([_actions, _facts], (requirements_gdl_next(_next_fact, _facts_tmp, _actions_tmp), exclude_vars(_facts_tmp, _facts), \+(member(_next_fact, _facts)), exclude_vars(_actions_tmp, _actions)), _conditions).
