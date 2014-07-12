@@ -752,7 +752,11 @@ void ConstructAtomDictionary(
 void RunGoalOnce(const std::string& query) {
   YAP_Term err;
   auto goal = YAP_ReadBuffer(query.c_str(), &err);
+#ifdef _YAPDEFS_H // YAP 6.3
   auto slot = YAP_InitSlot(goal);
+#else // YAP 6.2
+  YAP_InitSlot(goal);
+#endif
   YAP_RunGoalOnce(goal);
   YAP_Reset();
 #ifdef _YAPDEFS_H // YAP 6.3
