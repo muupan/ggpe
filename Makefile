@@ -26,7 +26,7 @@ CXXFLAGS_TEST := $(CXXFLAGS_DEBUG) -I./test -DGTEST_USE_OWN_TR1_TUPLE
 CXXFLAGS_TEST_LINUX := -fopenmp
 ifeq ($(OS), Darwin)
 else
-	CXX_FLAGS_TEST += $(CXXFLAGS_TEST_LINUX)
+	CXXFLAGS_TEST += $(CXXFLAGS_TEST_LINUX)
 endif
 SRCS_TEST := gtest/gtest_main.cc gtest/gtest-all.cc $(filter-out src/main.cpp, $(CXX_FILES))
 OBJS_TEST := $(shell echo $(SRCS_TEST) | perl -p -e 's/\.(cpp|cc)/\.o/g')
