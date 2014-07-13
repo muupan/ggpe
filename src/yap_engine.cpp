@@ -96,6 +96,8 @@ YAP_Functor state_fact_action_connections_functor;
 YAP_Functor state_fact_ordered_args_functor;
 // state_action_ordered_args/1
 YAP_Functor state_action_ordered_args_functor;
+// state_partial_goal/2
+YAP_Functor state_partial_goal_functor;
 
 // Utility functions
 template <class SuccessHandler, class FailureHandler>
@@ -343,11 +345,18 @@ std::vector<int> YapPairTermToGoals(const YAP_Term pair_term) {
     assert(YAP_IsAtomTerm(role_term));
     const auto role_atom = YapTermToAtom(role_term);
     const auto goal_term = YAP_HeadOfTerm(YAP_TailOfTerm(pair));
-    assert(YAP_IsAtomTerm(goal_term));
-    const auto goal_atom = YapTermToAtom(goal_term);
     assert(atom_to_role_index.count(role_atom));
-    assert(atom_to_goal_values.count(goal_atom));
-    goals[atom_to_role_index[role_atom]] = atom_to_goal_values[goal_atom];
+    if (YAP_IsAtomTerm(goal_term)) {
+      const auto goal_atom = YapTermToAtom(goal_term);
+      assert(atom_to_goal_values.count(goal_atom));
+      goals[atom_to_role_index[role_atom]] = atom_to_goal_values[goal_atom];
+    } else {
+      assert(YAP_IsIntTerm(goal_term));
+      const auto goal_value = YAP_IntOfTerm(goal_term);
+      assert(goal_value >= 0);
+      assert(goal_value <= 100);
+      goals[atom_to_role_index[role_atom]] = goal_value;
+    }
     temp_term = YAP_TailOfTerm(temp_term);
     ++goal_count;
   }
@@ -428,6 +437,7 @@ void CacheConstantYapObjects() {
   state_fact_action_connections_functor = YAP_MkFunctor(YAP_LookupAtom("state_fact_action_connections"), 1);
   state_fact_ordered_args_functor = YAP_MkFunctor(YAP_LookupAtom("state_fact_ordered_args"), 1);
   state_action_ordered_args_functor = YAP_MkFunctor(YAP_LookupAtom("state_action_ordered_args"), 1);
+  state_partial_goal_functor = YAP_MkFunctor(YAP_LookupAtom("state_partial_goal"), 2);
 }
 
 void CacheRoles() {
@@ -840,6 +850,22 @@ void InitializeYapEngine(
   if (enables_tabling) {
     RunGoalOnce("tabling_statistics");
   }
+}
+
+std::vector<int> GetPartialGoals(const StateSp& state) {
+#ifndef GGPE_SINGLE_THREAD
+  std::lock_guard<Mutex> lk(mutex);
+#endif
+  const auto fact_term = TuplesToYapPairTerm(state->GetFacts());
+  std::array<YAP_Term, 2> args = {{ fact_term, YAP_MkVarTerm() }};
+  auto goal = YAP_MkApplTerm(state_partial_goal_functor, 2, args.data());
+  std::vector<int> goals;
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto role_goal_pairs_term = YAP_ArgOfTerm(2, result);
+    goals = YapPairTermToGoals(role_goal_pairs_term);
+    assert(!goals.empty());
+  });
+  return goals;
 }
 
 StateSp CreateInitialState() {

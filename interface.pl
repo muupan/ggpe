@@ -865,3 +865,15 @@ state_win_conditions(_state_win_conditions) :-
 next_conditions(_next_fact, _conditions) :-
     find_unique_n(100, [_actions, _facts], (requirements_gdl_next(_next_fact, _facts_tmp, _actions_tmp), exclude_vars(_facts_tmp, _facts), \+(member(_next_fact, _facts)), exclude_vars(_actions_tmp, _actions)), _conditions).
 
+partial_goal(_role, _goal) :-
+    win_conditions_satisfaction_rate(_role, _rate),
+    _goal is integer(50 * _rate).
+
+state_partial_goal_without_assertion(_role_goal_pairs) :-
+    all([_role, _goal], partial_goal(_role, _goal), _role_goal_pairs).
+
+% Usage:
+%   ?- state_goal([cell('1','1',x),...,control(white)],X).
+%   X = [[white,'100'],[black,'0']]
+state_partial_goal(_facts, _role_goal_pairs) :-
+    run_with_facts(_facts, state_partial_goal_without_assertion(_role_goal_pairs)).

@@ -11,19 +11,20 @@ namespace ggpe {
 
 namespace {
 
-void SimpleSimulate(const StateSp& state) {
+StateSp SimpleSimulate(const StateSp& state) {
   auto tmp_state = state;
   while (!tmp_state->IsTerminal()) {
 //    std::cout << "tmp_state:" << std::endl;
 //    std::cout << tmp_state->ToString() << std::endl;
     JointAction joint_action(GetRoleCount());
     for (const auto role_idx : GetRoleIndices()) {
-      ASSERT_EQ(tmp_state->GetLegalActions().size(), GetRoleCount());
-      ASSERT_TRUE(!tmp_state->GetLegalActions().at(role_idx).empty());
+//      ASSERT_EQ(tmp_state->GetLegalActions().size(), GetRoleCount());
+//      ASSERT_TRUE(!tmp_state->GetLegalActions().at(role_idx).empty());
       joint_action.at(role_idx) = tmp_state->GetLegalActions().at(role_idx).front();
     }
     tmp_state = tmp_state->GetNextState(joint_action);
   }
+  return tmp_state;
 }
 
 #ifndef __clang__
@@ -169,6 +170,23 @@ TEST(Simulate, TicTacToe) {
   auto state = CreateInitialState();
   state->Simulate();
   SimpleSimulate(CreateInitialState());
+}
+
+TEST(GetGoals, TicTacToe) {
+  InitializeTicTacToe();
+  auto state = CreateInitialState();
+  const auto terminal_state = SimpleSimulate(CreateInitialState());
+  const auto goals = terminal_state->GetGoals();
+  ASSERT_EQ(goals.size(), 2);
+  ASSERT_EQ(goals[0] + goals[1], 100);
+}
+
+TEST(GetPartialGoals, TicTacToe) {
+  InitializeTicTacToe();
+  auto state = CreateInitialState();
+  const auto terminal_state = SimpleSimulate(CreateInitialState());
+  const auto goals = GetPartialGoals(terminal_state);
+  ASSERT_EQ(goals.size(), 2);
 }
 
 TEST(Atoms, TicTacToe) {

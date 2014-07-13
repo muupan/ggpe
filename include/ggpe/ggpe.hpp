@@ -188,6 +188,8 @@ std::string GetGGPEPath();
 
 EngineBackend GetEngineBackend();
 
+std::vector<int> GetPartialGoals(const StateSp& state);
+
 }
 
 #include "state.hpp"

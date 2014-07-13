@@ -497,4 +497,8 @@ EngineBackend GetEngineBackend() {
   }
 }
 
+std::vector<int> GetPartialGoals(const StateSp& state) {
+  return yap::GetPartialGoals(state);
+}
+
 }
