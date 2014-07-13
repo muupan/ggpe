@@ -70,6 +70,8 @@ StateSp CreateInitialState();
 
 std::vector<int> GetPartialGoals(const StateSp& state);
 
+std::vector<NextCondition> DetectNextConditions(const Fact& fact);
+
 }
 
 }

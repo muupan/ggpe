@@ -101,6 +101,8 @@ YAP_Functor state_action_ordered_args_functor;
 YAP_Functor state_partial_goal_functor;
 // state_win_conditions/1
 YAP_Functor state_win_conditions_functor;
+// next_conditions/2
+YAP_Functor next_conditions_functor;
 
 // Utility functions
 template <class SuccessHandler, class FailureHandler>
@@ -442,6 +444,7 @@ void CacheConstantYapObjects() {
   state_action_ordered_args_functor = YAP_MkFunctor(YAP_LookupAtom("state_action_ordered_args"), 1);
   state_partial_goal_functor = YAP_MkFunctor(YAP_LookupAtom("state_partial_goal"), 2);
   state_win_conditions_functor = YAP_MkFunctor(YAP_LookupAtom("state_win_conditions"), 1);
+  next_conditions_functor = YAP_MkFunctor(YAP_LookupAtom("next_conditions"), 2);
 }
 
 void CacheRoles() {
@@ -755,12 +758,12 @@ void ConstructAtomDictionary(
   atom_to_string.insert(AtomAndString(atoms::kRightParen, ")"));
 }
 
+
 void DetectWinConditions() {
   win_conditions.clear();
   win_conditions.resize(GetRoleCount());
   std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
   auto goal = YAP_MkApplTerm(state_win_conditions_functor, 1, args.data());
-  std::vector<int> goals;
   RunWithSlotOrError(goal, [&](const YAP_Term& result){
     const auto role_win_conditions_pair_terms =
         YapPairTermToYapTerms(YAP_ArgOfTerm(1, result));
@@ -903,6 +906,37 @@ std::vector<int> GetPartialGoals(const StateSp& state) {
   return goals;
 }
 
+std::vector<NextCondition> DetectNextConditions(const Fact& fact) {
+  std::vector<NextCondition> next_conditions;
+  std::array<YAP_Term, 2> args = {{ TupleToYapTerm(fact), YAP_MkVarTerm() }};
+  auto goal = YAP_MkApplTerm(next_conditions_functor, 2, args.data());
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto next_condition_terms =
+        YapPairTermToYapTerms(YAP_ArgOfTerm(2, result));
+    for (const auto& next_condition_term : next_condition_terms) {
+      const auto action_condition_fact_condition = YapPairTermToYapTerms(next_condition_term);
+      assert(action_condition_fact_condition.size() == 2);
+      // Action condition
+      const auto& action_condition_term = action_condition_fact_condition.front();
+      const auto role_action_pair_terms = YapPairTermToYapTerms(action_condition_term);
+      ActionCondition action_condition(GetRoleCount(), boost::none);
+      for (const auto& role_action_pair_term : role_action_pair_terms) {
+        const auto role_action_pair = YapPairTermToYapTerms(role_action_pair_term);
+        assert(role_action_pair.size() == 2);
+        const auto& role_term = role_action_pair.front();
+        const auto role_idx = atom_to_role_index.at(YapTermToAtom(role_term));
+        const auto& action_term = role_action_pair.back();
+        const auto action = YapTermToTuple(action_term);
+        action_condition[role_idx] = action;
+      }
+      // Fact condition
+      const auto& fact_condition_term = action_condition_fact_condition.back();
+      const auto fact_condition = YapPairTermToTuples(fact_condition_term);
+      next_conditions.emplace_back(action_condition, fact_condition);
+    }
+  });
+  return next_conditions;
+}
 
 StateSp CreateInitialState() {
   return std::make_shared<YapState>(initial_facts, std::vector<JointAction>());

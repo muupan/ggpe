@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/functional/hash.hpp>
+#include <boost/optional.hpp>
 
 #include <Yap/YapInterface.h>
 
@@ -189,6 +190,10 @@ std::string GetGGPEPath();
 EngineBackend GetEngineBackend();
 
 std::vector<int> GetPartialGoals(const StateSp& state);
+
+using ActionCondition = std::vector<boost::optional<Action>>;
+using NextCondition = std::pair<ActionCondition, FactSet>;
+std::vector<NextCondition> DetectNextConditions(const Fact& fact);
 
 }
 

@@ -502,4 +502,8 @@ std::vector<int> GetPartialGoals(const StateSp& state) {
   return yap::GetPartialGoals(state);
 }
 
+std::vector<NextCondition> DetectNextConditions(const Fact& fact) {
+  return yap::DetectNextConditions(fact);
+}
+
 }

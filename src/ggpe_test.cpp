@@ -189,6 +189,21 @@ TEST(GetPartialGoals, TicTacToe) {
   ASSERT_EQ(goals.size(), 2);
 }
 
+TEST(DetectNextConditions, TicTacToe) {
+  const auto cell_1_1_x = StringToTuple("(cell 1 1 x)");
+  const auto next_conditions = DetectNextConditions(cell_1_1_x);
+  ASSERT_EQ(next_conditions.size(), 1);
+  const auto& next_condition = next_conditions.front();
+  const auto& action_condition = next_condition.first;
+  ASSERT_EQ(action_condition.size(), GetRoleCount());
+  ASSERT_TRUE(action_condition[0]);
+  ASSERT_EQ(action_condition[0].get(), StringToTuple("(mark 1 1)"));
+  ASSERT_FALSE(action_condition[1]);
+  const auto& fact_condition = next_condition.second;
+  ASSERT_EQ(fact_condition.size(), 1);
+  ASSERT_EQ(fact_condition.front(), StringToTuple("(cell 1 1 b)"));
+}
+
 TEST(Atoms, TicTacToe) {
   InitializeTicTacToe();
   ASSERT_EQ(AtomToString(atoms::kFree), "?");
