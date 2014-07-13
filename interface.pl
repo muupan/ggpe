@@ -1,5 +1,8 @@
 :- use_module(library(lists)).
 :- use_module(library(maplist)).
+:- use_module(find_unique_n).
+:- use_module(subseq).
+:- use_module(list_to_conj).
 
 gdl_distinct(_x, _y) :- _x \= _y.
 
@@ -13,8 +16,10 @@ gdl_or(_x, _y, _z, _w, _v, _q, _r, _s) :- _x; _y; _z; _w; _v; _q; _r; _s.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t) :- _x; _y; _z; _w; _v; _q; _r; _s; _t.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t, _u) :- _x; _y; _z; _w; _v; _q; _r; _s; _t; _u.
 
-required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !, gdl_base(Fact).
+% required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !, gdl_base(Fact).
+required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !.
 required_action([Role, Action], RequiredActions) :- member([Role, Action], RequiredActions), !, gdl_input(Role, Action).
+% required_action([Role, Action], RequiredActions) :- member([Role, Action], RequiredActions), !.
 
 gdl_not(_x) :- not(_x).
 
@@ -728,13 +733,135 @@ fact_action_correspond_(_facts, _changes_list) :-
 
 exclude_vars(_list_with_vars, _list_without_vars) :-
     length(_list_with_vars, 10), include(nonvar, _list_with_vars, _list_without_vars).
+
+% set_limit(_limit) :- set_value(counter, _limit).
+% 
+% limiting :-
+%     get_value(counter, _limit),
+%     print(_limit),nl,
+%     _limit > 0,
+%     _next_limit is _limit - 1,
+%     set_value(counter, _next_limit).
+
+:- use_module(library(ordsets)).
+
+% unique_n(N, Template, Goal, List) :-
+%     list_to_ord_set([], _empty_set),
+%     unique_n_(N, Template, Goal, _empty_set, List).
+% 
+% unique_n_(N, Template, Goal, _current_set, List) :-
+%     once(Goal) ->(
+%         % (\+ member(Template, _current_set) -> ord_add_element(_current_set, Template, _next_set)),
+%         ord_union(_current_set, [Template], _next_set),
+%         length(_next_set, _len),
+%         (_len = N -> _next_set = List; unique_n_(N, Template, Goal, _next_set, List))).
+
+% unique_n(N, Template, Goal, List) :-
+%     list_to_ord_set([], _empty_set),
+%     set_value(set, _empty_set),
+%     repeat,
+%     (\+ Goal) -> (!, fail),
+%     get_value(set, _current_set),
+%     ord_union(_current_set, [Template], _next_set),
+%     length(_next_set, _len),
+%     _len < N -> fail,
+%     _next_set = List.
+
+step_counter_fact(_fact) :-
+    step_counter(_rel),
+    functor(_fact, _rel, _).
     
 win_conditions(_role, _win_conditions) :-
     gdl_role(_role),
-    all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition)), _win_conditions).
+    % set_limit(10),
+    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition), (limiting; (print('fail'), !, fail))), _win_conditions).
+    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition), length(_win_conditions, _len), _len < 10), _win_conditions).
+    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition)), _win_conditions).
+    find_unique_n(100, _win_condition, (
+        requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []),
+        exclude_vars(_win_condition_tmp, _win_condition_with_step_counter),
+        exclude(step_counter_fact, _win_condition_with_step_counter, _win_condition)
+    ), _win_conditions).
+    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition), (limiting; (fail, !))), _win_conditions).
+    %
+
+% all_facts_are_true(_facts) :-
+%     findall(gdl_true(_fact), member(_fact, _facts), _true_list),
+%     list_to_conj(_true_list, _true_conj),
+%     print(_true_conj),nl,
+%     call(_true_conj).
+%
+
+all_facts_are_true(_facts) :-
+    maplist(fact_to_true_fact, _facts, _true_list),
+    list_to_conj(_true_list, _true_conj),
+    call(_true_conj).
+
+fact_to_true_fact(_fact, gdl_true(_fact)).
+
+% all_facts_are_true(_facts) :-
+%     list_to_conj(_facts_list, _true_conj),
+%     print(_true_conj),nl,
+%     call(_true_conj).
+
+how_many_facts_are_true_for_unbound_facts(_facts, _n) :-
+    set_value(result, 0),
+    findall(_subseq, subseq0(_facts, _subseq), _subfacts_list),
+    sort_lists_by_length_desc(_subfacts_list, _subfacts_sorted_list),
+    ignore(forall(member(_subfacts, _subfacts_sorted_list), (
+        all_facts_are_true(_subfacts) ->
+        (length(_subfacts, _len), set_value(result, _len), fail);
+        true
+    ))),
+    get_value(result, _n).
+
+is_fact_true(_fact, _zero_or_one) :-
+    gdl_true(_fact) -> _zero_or_one = 1; _zero_or_one = 0.
+
+how_many_facts_are_true_for_bound_facts(_facts, _n) :-
+    maplist(is_fact_true, _facts, _zero_one_one_list),
+    sum_list(_zero_one_one_list, _n).
+
+is_bound_fact(_fact) :-
+    _fact =.. _tuple,
+    forall(member(_item, _tuple), nonvar(_item)).
+
+how_many_facts_are_true(_facts, _n) :-
+    include(is_bound_fact, _facts, _bound_facts),
+    exclude(is_bound_fact, _facts, _unbound_facts),
+    write('bound:'),print(_bound_facts),nl,
+    write('unbound:'),print(_unbound_facts),nl,
+    how_many_facts_are_true_for_bound_facts(_bound_facts, _bound_n),
+    how_many_facts_are_true_for_unbound_facts(_unbound_facts, _unbound_n),
+    _n is _bound_n + _unbound_n.
+
+compare_list_length_bigger(_delta, _list1, _list2) :-
+    length(_list1, _len1),
+    length(_list2, _len2),
+    compare(_delta_tmp, _len2, _len1),
+    (_delta_tmp = '=' -> compare(_delta, _list1, _list2); _delta = _delta_tmp).
+
+sort_lists_by_length_desc(_list, _sorted_list) :-
+    predsort(compare_list_length_bigger, _list, _sorted_list).
+
+condition_satisfaction_rate(_facts, _rate) :-
+    how_many_facts_are_true(_facts, _n),
+    length(_facts, _len),
+    _rate is _n / _len.
+
+win_conditions_satisfaction_rate(_role, _rate) :-
+    state_win_conditions(_state_win_conditions),
+    member([_role, _win_conditions], _state_win_conditions),
+    maplist(condition_satisfaction_rate, _win_conditions, _rates),
+    max_list(_rates, _rate).
 
 state_win_conditions(_state_win_conditions) :-
-    all([_role, _win_conditions], win_conditions(_role, _win_conditions), _state_win_conditions).
+    memo_state_win_conditions(_state_win_conditions), !.
+state_win_conditions(_state_win_conditions) :-
+    write('state_win_conditions'),
+    all([_role, _win_conditions], win_conditions(_role, _win_conditions), _state_win_conditions),
+    assertz(memo_state_win_conditions(_state_win_conditions)).
 
 next_conditions(_next_fact, _conditions) :-
-    all([_actions, _facts], (requirements_gdl_next(_next_fact, _facts_tmp, _actions_tmp), exclude_vars(_facts_tmp, _facts), \+(member(_next_fact, _facts)), exclude_vars(_actions_tmp, _actions)), _conditions).
+    find_unique_n(100, [_actions, _facts], (requirements_gdl_next(_next_fact, _facts_tmp, _actions_tmp), exclude_vars(_facts_tmp, _facts), \+(member(_next_fact, _facts)), exclude_vars(_actions_tmp, _actions)), _conditions).
+
