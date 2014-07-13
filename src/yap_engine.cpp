@@ -890,7 +890,7 @@ void InitializeYapEngine(
   }
 }
 
-std::vector<int> GetPartialGoals(const StateSp& state) {
+std::vector<int> GetPartialGoalsByYap(const StateSp& state) {
 #ifndef GGPE_SINGLE_THREAD
   std::lock_guard<Mutex> lk(mutex);
 #endif
@@ -903,6 +903,29 @@ std::vector<int> GetPartialGoals(const StateSp& state) {
     goals = YapPairTermToGoals(role_goal_pairs_term);
     assert(!goals.empty());
   });
+  return goals;
+}
+
+std::vector<int> GetPartialGoals(const StateSp& state) {
+  constexpr auto max_partial_goal = 50;
+  const auto& facts = state->GetFacts();
+  const std::unordered_set<Fact, boost::hash<Fact>> fact_set(facts.begin(), facts.end());
+  Goals goals(GetRoleCount(), 0);
+  for (const auto role_idx : GetRoleIndices()) {
+    for (const auto& cond_facts : win_conditions[role_idx]) {
+      if (cond_facts.empty()) {
+        // Sometimes empty conditions are detected, just ignore them.
+        continue;
+      }
+      const auto true_count = std::count_if(cond_facts.begin(), cond_facts.end(), [&](const Fact& fact){
+        return fact_set.count(fact);
+      });
+      const auto partial_goal = max_partial_goal * true_count / cond_facts.size();
+      if (goals[role_idx] < partial_goal) {
+        goals[role_idx] = partial_goal;
+      }
+    }
+  }
   return goals;
 }
 
