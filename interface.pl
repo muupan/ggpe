@@ -829,8 +829,8 @@ is_bound_fact(_fact) :-
 how_many_facts_are_true(_facts, _n) :-
     include(is_bound_fact, _facts, _bound_facts),
     exclude(is_bound_fact, _facts, _unbound_facts),
-    write('bound:'),print(_bound_facts),nl,
-    write('unbound:'),print(_unbound_facts),nl,
+    % write('bound:'),print(_bound_facts),nl,
+    % write('unbound:'),print(_unbound_facts),nl,
     how_many_facts_are_true_for_bound_facts(_bound_facts, _bound_n),
     how_many_facts_are_true_for_unbound_facts(_unbound_facts, _unbound_n),
     _n is _bound_n + _unbound_n.
@@ -858,7 +858,6 @@ win_conditions_satisfaction_rate(_role, _rate) :-
 state_win_conditions(_state_win_conditions) :-
     memo_state_win_conditions(_state_win_conditions), !.
 state_win_conditions(_state_win_conditions) :-
-    write('state_win_conditions'),
     all([_role, _win_conditions], win_conditions(_role, _win_conditions), _state_win_conditions),
     assertz(memo_state_win_conditions(_state_win_conditions)).
 
