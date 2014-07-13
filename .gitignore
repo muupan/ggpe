@@ -15,7 +15,6 @@ lib/libggp.so
 bin/test
 *.ggp
 *.log
-*.pl
 !/interface.pl
 !/test/tictactoe.kif
 !/test/breakthrough.kif
