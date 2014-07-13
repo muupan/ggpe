@@ -16,8 +16,8 @@ gdl_or(_x, _y, _z, _w, _v, _q, _r, _s) :- _x; _y; _z; _w; _v; _q; _r; _s.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t) :- _x; _y; _z; _w; _v; _q; _r; _s; _t.
 gdl_or(_x, _y, _z, _w, _v, _q, _r, _s, _t, _u) :- _x; _y; _z; _w; _v; _q; _r; _s; _t; _u.
 
-% required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !, gdl_base(Fact).
-required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !.
+required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !, gdl_base(Fact).
+% required_fact(Fact, RequiredFacts) :- member(Fact, RequiredFacts), !.
 required_action([Role, Action], RequiredActions) :- member([Role, Action], RequiredActions), !, gdl_input(Role, Action).
 % required_action([Role, Action], RequiredActions) :- member([Role, Action], RequiredActions), !.
 
@@ -773,17 +773,13 @@ step_counter_fact(_fact) :-
     
 win_conditions(_role, _win_conditions) :-
     gdl_role(_role),
-    % set_limit(10),
-    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition), (limiting; (print('fail'), !, fail))), _win_conditions).
-    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition), length(_win_conditions, _len), _len < 10), _win_conditions).
-    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition)), _win_conditions).
-    find_unique_n(100, _win_condition, (
+    state_role(_roles),
+    (length(_roles, 1) -> _max_cond_count = 1; _max_cond_count = 100),
+    find_unique_n(_max_cond_count, _win_condition, (
         requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []),
         exclude_vars(_win_condition_tmp, _win_condition_with_step_counter),
         exclude(step_counter_fact, _win_condition_with_step_counter, _win_condition)
     ), _win_conditions).
-    % all(_win_condition, (requirements_gdl_goal(_role, gdl_100, _win_condition_tmp, []), exclude_vars(_win_condition_tmp, _win_condition), (limiting; (fail, !))), _win_conditions).
-    %
 
 % all_facts_are_true(_facts) :-
 %     findall(gdl_true(_fact), member(_fact, _facts), _true_list),

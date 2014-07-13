@@ -51,6 +51,7 @@ bool game_enables_tabling = false;
 EngineBackend engine_backend;
 bool is_yap_engine_initialized = false;
 bool is_gdlcc_engine_initialized = false;
+std::vector<std::vector<FactSet>> win_conditions;
 
 //template <class Iterator>
 //std::string TupleToString(const Iterator& begin, const Iterator& end) {

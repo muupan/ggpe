@@ -51,6 +51,7 @@ extern std::unordered_map<Atom, std::unordered_map<int, Atom>> fact_ordered_args
 extern std::unordered_map<Atom, std::unordered_map<int, Atom>> action_ordered_args;
 extern std::string game_kif;
 extern bool game_enables_tabling;
+extern std::vector<std::vector<FactSet>> win_conditions;
 
 namespace yap {
 
@@ -98,6 +99,8 @@ YAP_Functor state_fact_ordered_args_functor;
 YAP_Functor state_action_ordered_args_functor;
 // state_partial_goal/2
 YAP_Functor state_partial_goal_functor;
+// state_win_conditions/1
+YAP_Functor state_win_conditions_functor;
 
 // Utility functions
 template <class SuccessHandler, class FailureHandler>
@@ -438,6 +441,7 @@ void CacheConstantYapObjects() {
   state_fact_ordered_args_functor = YAP_MkFunctor(YAP_LookupAtom("state_fact_ordered_args"), 1);
   state_action_ordered_args_functor = YAP_MkFunctor(YAP_LookupAtom("state_action_ordered_args"), 1);
   state_partial_goal_functor = YAP_MkFunctor(YAP_LookupAtom("state_partial_goal"), 2);
+  state_win_conditions_functor = YAP_MkFunctor(YAP_LookupAtom("state_win_conditions"), 1);
 }
 
 void CacheRoles() {
@@ -751,6 +755,36 @@ void ConstructAtomDictionary(
   atom_to_string.insert(AtomAndString(atoms::kRightParen, ")"));
 }
 
+void DetectWinConditions() {
+  win_conditions.clear();
+  win_conditions.resize(GetRoleCount());
+  std::array<YAP_Term, 1> args = {{ YAP_MkVarTerm() }};
+  auto goal = YAP_MkApplTerm(state_win_conditions_functor, 1, args.data());
+  std::vector<int> goals;
+  RunWithSlotOrError(goal, [&](const YAP_Term& result){
+    const auto role_win_conditions_pair_terms =
+        YapPairTermToYapTerms(YAP_ArgOfTerm(1, result));
+    assert(role_win_conditions_pair_terms.size() == GetRoleCount());
+    for (const auto& role_win_conditions_pair_term : role_win_conditions_pair_terms) {
+      const auto role_win_conditions_pair = YapPairTermToYapTerms(role_win_conditions_pair_term);
+      assert(role_win_conditions_pair.size() == 2);
+      const auto& role_term = role_win_conditions_pair.front();
+      const auto role_idx = atom_to_role_index.at(YapTermToAtom(role_term));
+      const auto& conditions_term = role_win_conditions_pair.back();
+      const auto condition_terms = YapPairTermToYapTerms(conditions_term);
+      for (const auto& condition_term : condition_terms) {
+        const auto condition = YapPairTermToTuples(condition_term);
+        std::cout << "Win condition for " << role_idx << ":";
+        for (const auto& fact : condition) {
+          std::cout << TupleToString(fact) << ",";
+        }
+        std::cout << std::endl;
+        win_conditions.at(role_idx).push_back(condition);
+      }
+    }
+  });
+}
+
 //void LoadPrologFile(const std::string& filename) {
 //  YAP_Term err;
 //  auto goal = YAP_ReadBuffer(
@@ -845,6 +879,7 @@ void InitializeYapEngine(
   DetectOrderedDomains();
   DetectStepCounters();
   DetectFactActionConnections();
+  DetectWinConditions();
 //  DetectFactOrderedArgs();
 //  DetectActionOrderedArgs();
   if (enables_tabling) {
@@ -867,6 +902,7 @@ std::vector<int> GetPartialGoals(const StateSp& state) {
   });
   return goals;
 }
+
 
 StateSp CreateInitialState() {
   return std::make_shared<YapState>(initial_facts, std::vector<JointAction>());
