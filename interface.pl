@@ -858,7 +858,7 @@ state_win_conditions(_state_win_conditions) :-
     assertz(memo_state_win_conditions(_state_win_conditions)).
 
 next_conditions(_next_fact, _conditions) :-
-    find_unique_n(100, [_actions, _facts], (requirements_gdl_next(_next_fact, _facts_tmp, _actions_tmp), exclude_vars(_facts_tmp, _facts), \+(member(_next_fact, _facts)), exclude_vars(_actions_tmp, _actions)), _conditions).
+    find_unique_n(1, [_actions, _facts], (requirements_gdl_next(_next_fact, _facts_tmp, _actions_tmp), exclude_vars(_facts_tmp, _facts), \+(member(_next_fact, _facts)), exclude_vars(_actions_tmp, _actions)), _conditions).
 
 partial_goal(_role, _goal) :-
     win_conditions_satisfaction_rate(_role, _rate),

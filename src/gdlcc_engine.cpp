@@ -109,7 +109,7 @@ void SaveKifFile(const std::string& kif_filename, const std::string& kif) {
  * <name>.kif -> <name>.cpp and <name>.h
  */
 void ConvertKifToCpp(const std::string& kif_filename) {
-  const auto convert_command = (boost::format("timeout 10 %1%/gdlcc %2%") %
+  const auto convert_command = (boost::format("timeout 5 %1%/gdlcc %2%") %
       GetGGPEPath() %
       kif_filename).str();
   std::cout << "Command: " << convert_command << std::endl;
@@ -131,7 +131,7 @@ void CompileCppIntoSharedLibrary(
 #endif
   const auto ggpe_include_path = GetGGPEPath() + "/include";
   const auto compile_command =
-      (boost::format("timeout 10 $CXX -std=c++11 %1% -I%2% -I./ %3% -shared -fPIC -o %4%") %
+      (boost::format("timeout 13 $CXX -std=c++11 %1% -I%2% -I./ %3% -shared -fPIC -o %4%") %
           optimization_options %
           ggpe_include_path %
           cpp_filename %
