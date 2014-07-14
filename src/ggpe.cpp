@@ -506,4 +506,8 @@ std::vector<NextCondition> DetectNextConditions(const Fact& fact) {
   return yap::DetectNextConditions(fact);
 }
 
+const std::vector<std::vector<FactSet>>& GetWinConditions() {
+  return win_conditions;
+}
+
 }

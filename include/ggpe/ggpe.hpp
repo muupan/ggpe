@@ -195,6 +195,8 @@ using ActionCondition = std::vector<boost::optional<Action>>;
 using NextCondition = std::pair<ActionCondition, FactSet>;
 std::vector<NextCondition> DetectNextConditions(const Fact& fact);
 
+const std::vector<std::vector<FactSet>>& GetWinConditions();
+
 }
 
 #include "state.hpp"
