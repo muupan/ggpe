@@ -129,10 +129,16 @@ void CompileCppIntoSharedLibrary(
 #else
   const auto optimization_options = std::string("-O0 -g");
 #endif
+#ifdef GGPE_SINGLE_THREAD
+  const auto threading_options = std::string("-DGGPE_SINGLE_THREAD");
+#else
+  const auto threading_options = std::string("");
+#endif
   const auto ggpe_include_path = GetGGPEPath() + "/include";
   const auto compile_command =
-      (boost::format("timeout 13 $CXX -std=c++11 %1% -I%2% -I./ %3% -shared -fPIC -o %4%") %
+      (boost::format("timeout 13 $CXX -std=c++11 %1% %2% -I%3% -I./ %4% -shared -fPIC -o %5%") %
           optimization_options %
+          threading_options %
           ggpe_include_path %
           cpp_filename %
           lib_filename).str();
