@@ -143,12 +143,16 @@ bool IsGDLCCEngineValid() {
   while (!yap_state->IsTerminal()) {
     if (gdlcc_state->IsTerminal()) {
       std::cout << "YapState is not terminal, but CppState is terminal." << std::endl;
+      std::cout << "YapState:\n" << yap_state->ToString();
+      std::cout << "CppState:\n" << gdlcc_state->ToString();
       return false;
     }
     auto yap_facts = yap_state->GetFacts();
     auto gdlcc_facts = gdlcc_state->GetFacts();
     if (yap_facts.size() != gdlcc_facts.size()) {
       std::cout << "The number of facts in a state differs for YapState and CppState." << std::endl;
+      std::cout << "YapState:" << yap_state->GetFacts().size() << std::endl << yap_state->ToString();
+      std::cout << "CppState:" << gdlcc_state->GetFacts().size() << std::endl << gdlcc_state->ToString();
       return false;
     }
     std::sort(yap_facts.begin(), yap_facts.end());
@@ -165,6 +169,8 @@ bool IsGDLCCEngineValid() {
     }
     if (yap_state->GetLegalActions().size() != gdlcc_state->GetLegalActions().size()) {
       std::cout << "The number of legal actions in a state differs for YapState and CppState." << std::endl;
+      std::cout << "YapState:" << yap_state->GetLegalActions().size() << std::endl << yap_state->ToString();
+      std::cout << "CppState:" << gdlcc_state->GetLegalActions().size() << std::endl << gdlcc_state->ToString();
       return false;
     }
     JointAction joint_action;
@@ -173,12 +179,16 @@ bool IsGDLCCEngineValid() {
       auto gdlcc_actions = gdlcc_state->GetLegalActions()[role_idx];
       if (yap_actions.size() != gdlcc_actions.size()) {
         std::cout << "The number of legal actions for " << role_idx << " in a state differs for YapState and CppState." << std::endl;
+        std::cout << "YapState:" << yap_state->GetLegalActions()[role_idx].size() << std::endl << yap_state->ToString();
+        std::cout << "CppState:" << gdlcc_state->GetLegalActions()[role_idx].size() << std::endl << gdlcc_state->ToString();
         return false;
       }
       std::sort(yap_actions.begin(), yap_actions.end());
       std::sort(gdlcc_actions.begin(), gdlcc_actions.end());
       if (yap_actions != gdlcc_actions) {
         std::cout << "The legal actions for " << role_idx << " in a state differ for YapState and CppState." << std::endl;
+        std::cout << "YapState:\n" << yap_state->ToString();
+        std::cout << "CppState:\n" << gdlcc_state->ToString();
         return false;
       }
       joint_action.push_back(yap_actions.front());
@@ -188,10 +198,14 @@ bool IsGDLCCEngineValid() {
   }
   if (!yap_state->IsTerminal()) {
     std::cout << "YapState is terminal, but CppState is not terminal." << std::endl;
+    std::cout << "YapState:\n" << yap_state->ToString();
+    std::cout << "CppState:\n" << gdlcc_state->ToString();
     return false;
   }
   if (yap_state->GetGoals() != gdlcc_state->GetGoals()) {
     std::cout << "The goal value in a state differs for YapState and CppState." << std::endl;
+    std::cout << "YapState:\n" << yap_state->ToString();
+    std::cout << "CppState:\n" << gdlcc_state->ToString();
     return false;
   }
   std::cout << "GDLCC engine is valid." << std::endl;
